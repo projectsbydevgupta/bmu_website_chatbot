@@ -23,11 +23,15 @@ if %ERRORLEVEL% NEQ 0 (
 echo       Done!
 echo.
 
-:: Kill any existing processes on ports 8000, 8001, and 8002
-echo [2/4] Starting microservices...
-echo       Clearing ports 8000, 8001, and 8002...
-powershell -Command "Get-NetTCPConnection -LocalPort 8000,8001,8002 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" 2>nul
+:: Kill any existing processes on ports 8000, 8001, 8002, and 6006
+echo [2/4] Starting services and observability...
+echo       Clearing ports 8000, 8001, 8002, and 6006...
+powershell -Command "Get-NetTCPConnection -LocalPort 8000,8001,8002,6006 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" 2>nul
 timeout /t 2 /nobreak >nul
+
+:: Start Arize Phoenix Tracing Server on port 6006
+echo       Starting Phoenix Observability Server on port 6006...
+start "BMU-Phoenix-Tracing" /min cmd /c "python phoenix_service.py"
 
 :: Start the Retrieval Microservice on port 8001
 echo       Starting Retrieval Microservice on port 8001...
@@ -65,6 +69,7 @@ echo       Still loading... (attempt %RETRIES%/12)
 goto healthcheck
 
 :servers_ready
+echo       Phoenix Observability running at http://127.0.0.1:6006
 echo       Retrieval Microservice running at http://127.0.0.1:8001
 echo       Ingestion Microservice running at http://127.0.0.1:8002
 echo       Backend Orchestrator running at http://127.0.0.1:8000
@@ -86,6 +91,7 @@ echo    Retrieval Service:  http://127.0.0.1:8001
 echo    Retrieval Docs:     http://127.0.0.1:8001/docs
 echo    Ingestion Service:  http://127.0.0.1:8002
 echo    Ingestion Docs:     http://127.0.0.1:8002/docs
+echo    Phoenix Tracing:    http://127.0.0.1:6006
 echo    Frontend:           frontend\index.html
 echo.
 echo    Press any key to STOP all services...
@@ -95,6 +101,6 @@ pause >nul
 :: Shutdown: kill all services
 echo.
 echo Shutting down services...
-powershell -Command "Get-NetTCPConnection -LocalPort 8000,8001,8002 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" 2>nul
+powershell -Command "Get-NetTCPConnection -LocalPort 8000,8001,8002,6006 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" 2>nul
 echo Done. Goodbye!
 timeout /t 2 /nobreak >nul

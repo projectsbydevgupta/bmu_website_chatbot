@@ -8,8 +8,10 @@ from pydantic import BaseModel, Field
 
 from jev_guardrails import jev_guardrail
 from bmu_rag_graph import bmu_rag_app, BMURAGState
+from phoenix_tracer import init_phoenix_tracing, get_tracer
 
 load_dotenv()
+init_phoenix_tracing()
 
 app = FastAPI(title="BMU Multi-Agent Semantic QA API (LangGraph + JEV)", version="2.0.0")
 
@@ -48,7 +50,7 @@ class AskResponse(BaseModel):
     agent_trace: Optional[list[dict[str, Any]]] = None
 
 
-def _build_answer(query: str) -> AskResponse:
+def _build_answer_internal(query: str) -> AskResponse:
     # =========================================================================
     # 1. JEV INPUT GUARDRAILS (Prompt Injection, Toxicity, Academic Domain)
     # =========================================================================
@@ -158,6 +160,24 @@ def _build_answer(query: str) -> AskResponse:
         ),
         agent_trace=agent_trace,
     )
+
+
+def _build_answer(query: str) -> AskResponse:
+    tracer = get_tracer()
+    try:
+        with tracer.start_as_current_span("bmu_rag_pipeline") as span:
+            span.set_attribute("openinference.span.kind", "CHAIN")
+            span.set_attribute("input.value", query)
+            resp = _build_answer_internal(query)
+            span.set_attribute("output.value", resp.answer)
+            if resp.guardrail:
+                span.set_attribute("guardrail.status", resp.guardrail.status)
+                span.set_attribute("guardrail.action", resp.guardrail.action)
+                span.set_attribute("guardrail.reason", resp.guardrail.reason)
+            return resp
+    except Exception:
+        # Fallback to direct execution if tracing encounters any issue
+        return _build_answer_internal(query)
 
 
 @app.get("/health")

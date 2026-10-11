@@ -27,6 +27,13 @@ import trafilatura
 ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 load_dotenv(ENV_PATH)
 
+# Initialize Phoenix AI Observability & Tracing
+try:
+    from phoenix_tracer import init_phoenix_tracing
+    init_phoenix_tracing()
+except Exception:
+    pass
+
 # Retrieval Microservice URL
 RETRIEVAL_SERVICE_URL = os.getenv("RETRIEVAL_SERVICE_URL", "http://127.0.0.1:8001")
 
