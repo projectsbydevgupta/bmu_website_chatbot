@@ -1,0 +1,15 @@
+chromadb
+pandas
+sentence-transformers
+scikit-learn
+numpy
+trafilatura
+requests
+python-dotenv
+tqdm
+fastapi
+uvicorn
+groq
+typesafe-sdk>=0.7.0
+langgraph>=1.2.0
+langchain-core>=1.6.0

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BMU Chat Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=2.1" />
+  </head>
+  <body>
+    <div class="page-bg"></div>
+
+    <header class="topbar">
+      <div class="brand-wrap">
+        <div class="brand-mark">BMU</div>
+        <div class="brand-text">
+          <p class="brand-title">BML Munjal University</p>
+          <p class="brand-subtitle">Chat Assistant</p>
+        </div>
+      </div>
+      <p class="topbar-note">Reliable, structured academic guidance</p>
+    </header>
+
+    <main class="main-layout">
+      <section class="chat-shell" aria-label="BMU chatbot">
+        <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
+
+        <div class="suggestions">
+          <button class="suggestion-btn" type="button" data-query="Courses offered">Courses offered</button>
+          <button class="suggestion-btn" type="button" data-query="Faculty details">Faculty details</button>
+          <button class="suggestion-btn" type="button" data-query="Admissions process">Admissions process</button>
+        </div>
+
+        <form id="chatForm" class="input-row" autocomplete="off">
+          <input
+            id="queryInput"
+            class="chat-input"
+            type="text"
+            name="query"
+            placeholder="Ask your question"
+            required
+          />
+          <button id="sendBtn" class="send-btn" type="submit">Send</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="./app.js?v=2.1"></script>
+  </body>
+</html>

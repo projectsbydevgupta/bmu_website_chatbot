@@ -1,0 +1,11 @@
+{
+  "total_queries": 100,
+  "successful": 100,
+  "failed": 0,
+  "avg_relevance": 0.58,
+  "avg_faithfulness": 1.81,
+  "avg_completeness": 0.95,
+  "avg_conciseness": 4.32,
+  "avg_correctness": 1.69,
+  "avg_final_score": 1.87
+}

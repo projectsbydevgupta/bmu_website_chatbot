@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "phoenix-cli": {
+      "source": "Arize-ai/phoenix",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/phoenix-cli/SKILL.md",
+      "computedHash": "1ba4842c9ac22c470ec7e0267cc8096535c3e1601842f09ace3d740ef5cf5685"
+    },
+    "phoenix-error-analysis": {
+      "source": "Arize-ai/phoenix",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/phoenix-error-analysis/SKILL.md",
+      "computedHash": "8e8dc8595bd099f02c38b3659a31a80653d423918461f46237790b5ea4d23301"
+    },
+    "phoenix-evals": {
+      "source": "Arize-ai/phoenix",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/phoenix-evals/SKILL.md",
+      "computedHash": "430544b7e2d45853e51b373f490d1db2807f70717158c4f53d7d86a5f896da9f"
+    },
+    "phoenix-harbor": {
+      "source": "Arize-ai/phoenix",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/phoenix-harbor/SKILL.md",
+      "computedHash": "45495378bfc90e6ee99388bb3e09af9a0d70484c8e050cafb05b19067d389252"
+    },
+    "phoenix-tracing": {
+      "source": "Arize-ai/phoenix",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/phoenix-tracing/SKILL.md",
+      "computedHash": "7a70f788183423836656cc7243e1ca0623a9ca9fcce671a34729df416572570e"
+    }
+  }
+}
