@@ -1,4 +1,6 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = (typeof window !== "undefined" && window.location.origin && window.location.origin.startsWith("http"))
+  ? window.location.origin
+  : "http://127.0.0.1:8000";
 
 const chatMessages = document.getElementById("chatMessages");
 const chatForm = document.getElementById("chatForm");
@@ -6,9 +8,149 @@ const queryInput = document.getElementById("queryInput");
 const sendBtn = document.getElementById("sendBtn");
 const suggestionButtons = document.querySelectorAll(".suggestion-btn");
 
-function addMessage(role, text, sources = [], guardrail = null, agentTrace = []) {
+// Toggle controls
+const llmCloudBtn = document.getElementById("llmCloudBtn");
+const llmLocalBtn = document.getElementById("llmLocalBtn");
+const guardrailsToggle = document.getElementById("guardrailsToggle");
+const guardrailsStatusText = document.getElementById("guardrailsStatusText");
+
+let selectedLlm = "groq";
+let guardrailsEnabled = true;
+
+// Modal controls
+const localLlmModal = document.getElementById("localLlmModal");
+const closeModalBtn = document.getElementById("closeModalBtn");
+const confirmCloudBtn = document.getElementById("confirmCloudBtn");
+
+function openLocalLlmModal() {
+  if (localLlmModal) {
+    localLlmModal.classList.add("open");
+    localLlmModal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeLocalLlmModal() {
+  if (localLlmModal) {
+    localLlmModal.classList.remove("open");
+    localLlmModal.setAttribute("aria-hidden", "true");
+  }
+}
+
+if (closeModalBtn) closeModalBtn.addEventListener("click", closeLocalLlmModal);
+if (confirmCloudBtn) confirmCloudBtn.addEventListener("click", closeLocalLlmModal);
+if (localLlmModal) {
+  localLlmModal.addEventListener("click", (e) => {
+    if (e.target === localLlmModal) closeLocalLlmModal();
+  });
+}
+
+// Pre-check Local LLM availability on page load in background (0ms click latency)
+let localLlmAvailable = null;
+
+async function checkLocalLlmAvailability() {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/llm/local-status`);
+    const data = await resp.json();
+    localLlmAvailable = Boolean(data && data.available);
+  } catch (_) {
+    localLlmAvailable = false;
+  }
+}
+
+// Background warm-up probe on load
+checkLocalLlmAvailability();
+
+if (llmCloudBtn && llmLocalBtn) {
+  llmCloudBtn.addEventListener("click", () => {
+    selectedLlm = "groq";
+    llmCloudBtn.classList.add("active");
+    llmCloudBtn.setAttribute("aria-checked", "true");
+    llmLocalBtn.classList.remove("active");
+    llmLocalBtn.setAttribute("aria-checked", "false");
+  });
+
+  llmLocalBtn.addEventListener("click", async () => {
+    // If background check hasn't finished yet, resolve it quickly
+    if (localLlmAvailable === null) {
+      await checkLocalLlmAvailability();
+    }
+
+    if (localLlmAvailable) {
+      // Local LLM is available! Switch instantly with zero popup/interruption
+      selectedLlm = "local";
+      llmLocalBtn.classList.add("active");
+      llmLocalBtn.setAttribute("aria-checked", "true");
+      llmCloudBtn.classList.remove("active");
+      llmCloudBtn.setAttribute("aria-checked", "false");
+    } else {
+      // Local LLM not present (e.g. cloud deployment) -> Keep Groq active and show guidance
+      selectedLlm = "groq";
+      llmCloudBtn.classList.add("active");
+      llmCloudBtn.setAttribute("aria-checked", "true");
+      llmLocalBtn.classList.remove("active");
+      llmLocalBtn.setAttribute("aria-checked", "false");
+      openLocalLlmModal();
+
+      // Silently re-check in background in case user just booted Ollama
+      checkLocalLlmAvailability();
+    }
+  });
+}
+
+
+
+if (guardrailsToggle && guardrailsStatusText) {
+  guardrailsToggle.addEventListener("change", () => {
+    guardrailsEnabled = guardrailsToggle.checked;
+    if (guardrailsEnabled) {
+      guardrailsStatusText.textContent = "ON";
+      guardrailsStatusText.className = "switch-status-text active";
+    } else {
+      guardrailsStatusText.textContent = "OFF";
+      guardrailsStatusText.className = "switch-status-text inactive";
+    }
+  });
+}
+
+function addMessage(
+  role,
+  text,
+  sources = [],
+  guardrail = null,
+  agentTrace = [],
+  llmProvider = null,
+  guardrailsActive = null
+) {
   const node = document.createElement("article");
   node.className = `msg ${role}`;
+
+  // Render Source Provenance Bar (for bot responses from backend)
+  if (role === "bot" && llmProvider) {
+    const sourceBar = document.createElement("div");
+    sourceBar.className = "msg-source-bar";
+
+    const llmPill = document.createElement("span");
+    if (llmProvider === "local") {
+      llmPill.className = "source-pill llm-local";
+      llmPill.innerHTML = "💻 Local LLM (Ollama)";
+    } else {
+      llmPill.className = "source-pill llm-cloud";
+      llmPill.innerHTML = "☁️ Cloud LLM (Groq)";
+    }
+    sourceBar.appendChild(llmPill);
+
+    const guardPill = document.createElement("span");
+    if (guardrailsActive) {
+      guardPill.className = "source-pill guard-active";
+      guardPill.innerHTML = "🛡️ Guardrails: ON";
+    } else {
+      guardPill.className = "source-pill guard-off";
+      guardPill.innerHTML = "⚠️ Guardrails: OFF";
+    }
+    sourceBar.appendChild(guardPill);
+
+    node.appendChild(sourceBar);
+  }
 
   if (role === "bot" && guardrail) {
     if (guardrail.status === "blocked") {
@@ -25,6 +167,9 @@ function addMessage(role, text, sources = [], guardrail = null, agentTrace = [])
       node.appendChild(badge);
     } else if (guardrail.action === "retrieval_gated") {
       badge.textContent = "🛡️ Relevance Gated: Low Knowledge Base Match";
+      node.appendChild(badge);
+    } else if (guardrail.status === "bypassed") {
+      badge.textContent = "⚠️ Guardrails Bypassed (Raw LLM Generation)";
       node.appendChild(badge);
     }
   }
@@ -45,7 +190,8 @@ function addMessage(role, text, sources = [], guardrail = null, agentTrace = [])
     list.className = "agent-trace-list";
     agentTrace.forEach((item) => {
       const li = document.createElement("li");
-      li.innerHTML = `<strong>${item.agent}</strong> — <span class="trace-latency">${item.latency_ms}ms</span>`;
+      const providerLabel = item.details?.provider ? `[${item.details.provider.toUpperCase()}] ` : "";
+      li.innerHTML = `<strong>${item.agent}</strong> ${providerLabel}— <span class="trace-latency">${item.latency_ms}ms</span>`;
       list.appendChild(li);
     });
     traceCard.appendChild(list);
@@ -81,7 +227,11 @@ async function askBackend(query) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({
+      query,
+      llm_provider: selectedLlm,
+      enable_guardrails: guardrailsEnabled,
+    }),
   });
 
   if (!response.ok) {
@@ -115,7 +265,9 @@ async function submitQuery(query) {
       data.answer || "No answer returned",
       data.top_results || [],
       data.guardrail || null,
-      data.agent_trace || []
+      data.agent_trace || [],
+      data.llm_provider || selectedLlm,
+      typeof data.guardrails_enabled === "boolean" ? data.guardrails_enabled : guardrailsEnabled
     );
   } catch (error) {
     addMessage("bot", `Unable to process request: ${error.message}`);

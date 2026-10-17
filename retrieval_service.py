@@ -355,7 +355,9 @@ def retrieve_compare(req: RetrieveRequest) -> Dict[str, Any]:
 if __name__ == "__main__":
     import uvicorn
 
+    host = os.getenv("RETRIEVAL_HOST", "0.0.0.0")
     port = int(os.getenv("RETRIEVAL_SERVICE_PORT", "8001"))
-    print(f"Starting BMU Retrieval Microservice on http://127.0.0.1:{port}...")
-    uvicorn.run("retrieval_service:app", host="127.0.0.1", port=port, reload=False)
+    print(f"Starting BMU Retrieval Microservice on http://{host}:{port}...")
+    uvicorn.run("retrieval_service:app", host=host, port=port, reload=False)
+
 

@@ -13,6 +13,7 @@ structured probabilistic guardrails:
    - Policy & Safety Compliance (Noul)
 """
 
+from __future__ import annotations
 import os
 import re
 import time

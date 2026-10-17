@@ -65,6 +65,7 @@ env.bak/
 venv.bak/
 
 # IDEs and editors
+.agents/
 .vscode/
 .idea/
 *.suo

@@ -23,7 +23,51 @@
           <p class="brand-subtitle">Chat Assistant</p>
         </div>
       </div>
-      <p class="topbar-note">Reliable, structured academic guidance</p>
+
+      <div class="control-cluster">
+        <!-- LLM Selector Toggle -->
+        <div class="control-item" title="Switch between Cloud Groq and Local Ollama LLM">
+          <span class="control-label">LLM Provider</span>
+          <div class="segmented-control" id="llmToggleGroup" role="radiogroup" aria-label="LLM Provider Selection">
+            <button
+              type="button"
+              id="llmCloudBtn"
+              class="seg-btn active"
+              data-provider="groq"
+              role="radio"
+              aria-checked="true"
+            >
+              <span class="seg-icon">☁️</span> Cloud (Groq)
+            </button>
+            <button
+              type="button"
+              id="llmLocalBtn"
+              class="seg-btn"
+              data-provider="local"
+              role="radio"
+              aria-checked="false"
+            >
+              <span class="seg-icon">💻</span> Local LLM
+            </button>
+          </div>
+        </div>
+
+        <!-- Guardrails Toggle Switch -->
+        <div class="control-item" title="Toggle JEV security & factual grounding guardrails">
+          <span class="control-label">JEV Guardrails</span>
+          <div class="switch-wrap">
+            <label class="toggle-switch" for="guardrailsToggle" aria-label="Toggle Guardrails">
+              <input type="checkbox" id="guardrailsToggle" checked />
+              <span class="slider"></span>
+            </label>
+            <span class="switch-status-text active" id="guardrailsStatusText">ON</span>
+          </div>
+        </div>
+
+        <a href="evaluation.html" class="eval-nav-btn" title="Open 100-Question Model Evaluation Observatory">
+          📊 Benchmark Observatory
+        </a>
+      </div>
     </header>
 
     <main class="main-layout">
@@ -50,6 +94,42 @@
       </section>
     </main>
 
-    <script src="./app.js?v=2.1"></script>
+    <!-- Local LLM Environment Info Modal -->
+    <div id="localLlmModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-labelledby="localModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">💻</span>
+            <h3 id="localModalTitle" class="modal-title">Local LLM (On-Device Privacy)</h3>
+          </div>
+          <button id="closeModalBtn" class="modal-close" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-intro">
+            Local LLM inference runs directly on your device's own hardware (via <strong>Meta Llama 3.2</strong>) for complete offline privacy.
+          </p>
+          <div class="modal-alert">
+            <span class="modal-alert-icon">ℹ️</span>
+            <div>
+              <strong>Deployment Notice:</strong> On cloud-hosted servers, heavy local model weights are not hosted in the cloud.
+            </div>
+          </div>
+          <h4 class="modal-steps-heading">How to run Local LLM on your PC:</h4>
+          <ol class="modal-steps-list">
+            <li><strong>Install Ollama:</strong> Download free from <a href="https://ollama.com" target="_blank" rel="noopener">ollama.com</a>.</li>
+            <li><strong>Pull Model:</strong> Open terminal and run: <code>ollama pull llama3.2</code>.</li>
+            <li><strong>Run Locally:</strong> Run <code>run.bat</code> to chat with 100% on-device inference!</li>
+          </ol>
+        </div>
+        <div class="modal-footer">
+          <button id="confirmCloudBtn" class="modal-primary-btn" type="button">
+            Got it — Continue with Cloud LLM (Groq)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./app.js?v=2.2"></script>
   </body>
 </html>
+

@@ -75,10 +75,145 @@ body {
   color: var(--muted);
 }
 
-.topbar-note {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #4a4a4a;
+/* =========================================
+   Topbar Controls (LLM & Guardrails Toggles)
+   ========================================= */
+.control-cluster {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.control-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* Segmented Control (Cloud vs Local LLM) */
+.segmented-control {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.seg-btn {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.seg-btn:hover:not(.active) {
+  color: var(--primary);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.seg-btn.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(139, 0, 0, 0.25);
+}
+
+.seg-btn .seg-icon {
+  font-size: 0.85rem;
+}
+
+/* Guardrails Switch Wrap */
+.switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 28px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #cbd5e1;
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .slider {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.toggle-switch input:focus + .slider {
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.toggle-switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.switch-status-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  min-width: 28px;
+  transition: color 0.2s ease;
+}
+
+.switch-status-text.active {
+  color: #15803d;
+}
+
+.switch-status-text.inactive {
+  color: #d97706;
 }
 
 .main-layout {
@@ -290,6 +425,58 @@ body {
   border: 1px solid #bbf7d0;
 }
 
+.guardrail-badge.bypassed {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* =========================================
+   Response Source Bar (LLM & Guardrail Status)
+   ========================================= */
+.msg-source-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  line-height: 1.3;
+}
+
+.source-pill.llm-cloud {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.source-pill.llm-local {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.source-pill.guard-active {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.source-pill.guard-off {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
 /* =========================================
    LangGraph Agent Trace Card
    ========================================= */
@@ -331,5 +518,194 @@ body {
 .trace-latency {
   color: #0284c7;
   font-weight: 600;
+}
+
+.eval-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #0f172a;
+  color: #38bdf8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  transition: all 0.2s ease;
+}
+
+.eval-nav-btn:hover {
+  background: #1e293b;
+  color: #7dd3fc;
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Local LLM Environment Modal Dialog
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  padding: 1.25rem;
+}
+
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  transform: scale(0.95) translateY(10px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-backdrop.open .modal-card {
+  transform: scale(1) translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.4rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modal-icon {
+  font-size: 1.35rem;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.modal-close:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.modal-body {
+  padding: 1.4rem;
+  color: #334155;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.modal-intro {
+  margin: 0 0 1rem 0;
+}
+
+.modal-alert {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.86rem;
+  color: #1e40af;
+  margin-bottom: 1.2rem;
+}
+
+.modal-alert-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.modal-steps-heading {
+  margin: 0 0 0.6rem 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-steps-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+}
+
+.modal-steps-list a {
+  color: #0284c7;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.modal-steps-list code {
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.84rem;
+  border: 1px solid #e2e8f0;
+}
+
+.modal-footer {
+  padding: 1rem 1.4rem;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-primary-btn {
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.modal-primary-btn:hover {
+  background: #0369a1;
+  transform: translateY(-1px);
 }
 

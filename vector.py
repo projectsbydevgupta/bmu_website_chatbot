@@ -39,10 +39,15 @@ print("✅ Connected to Chroma")
 # ==============================
 print("📁 Loading CSV...")
 
-csv_path = r"C:\Users\Chait\Downloads\bmu_summaries.csv"
-df = pd.read_csv(csv_path)
+csv_path = os.getenv("CSV_PATH", "bmu_summaries.csv")
+if not os.path.exists(csv_path):
+    print(f"⚠️ CSV file not found at: {csv_path}")
+    print("ℹ️ Note: If you have bmu_knowledge_backup.json, use 'restore_knowledge_base.py' instead.")
+    sys.exit(0)
 
+df = pd.read_csv(csv_path)
 print(f"✅ Loaded {len(df)} rows")
+
 
 # ==============================
 # 🧠 Load Model

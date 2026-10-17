@@ -14,7 +14,7 @@ cd /d "%~dp0"
 
 :: Install dependencies
 echo [1/3] Installing dependencies...
-pip install -r requirements.txt --quiet 2>nul
+py -3.10 -m pip install -r requirements.txt --quiet 2>nul
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to install dependencies. Please check your Python installation.
     pause
@@ -31,19 +31,19 @@ timeout /t 2 /nobreak >nul
 
 :: Start Arize Phoenix Tracing Server on port 6006
 echo       Starting Phoenix Observability Server on port 6006...
-start "BMU-Phoenix-Tracing" /min cmd /c "python phoenix_service.py"
+start "BMU-Phoenix-Tracing" /min cmd /c "py -3.10 phoenix_service.py"
 
 :: Start the Retrieval Microservice on port 8001
 echo       Starting Retrieval Microservice on port 8001...
-start "BMU-Retrieval-Microservice" /min cmd /c "python retrieval_service.py"
+start "BMU-Retrieval-Microservice" /min cmd /c "py -3.10 retrieval_service.py"
 
 :: Start the Ingestion Microservice on port 8002
 echo       Starting Ingestion Microservice on port 8002...
-start "BMU-Ingestion-Microservice" /min cmd /c "python ingestion_service.py"
+start "BMU-Ingestion-Microservice" /min cmd /c "py -3.10 ingestion_service.py"
 
 :: Start the FastAPI backend server on port 8000
 echo       Starting Backend Orchestrator on port 8000...
-start "BMU-Backend" /min cmd /c "python semantic.py"
+start "BMU-Backend" /min cmd /c "py -3.10 semantic.py"
 
 :: Wait for servers to boot up
 echo       Waiting for microservices to initialize...
@@ -77,7 +77,7 @@ echo.
 
 :: Open the frontend in the default browser
 echo [3/4] Opening frontend in browser...
-start "" "frontend\index.html"
+start "" "http://127.0.0.1:8000/dashboard/"
 echo       Frontend opened!
 echo.
 
@@ -85,6 +85,7 @@ echo ============================================
 echo    BMU Chat Assistant is ready!
 echo ============================================
 echo.
+echo    Frontend UI:        http://127.0.0.1:8000/dashboard/
 echo    Backend API:        http://127.0.0.1:8000
 echo    Backend Docs:       http://127.0.0.1:8000/docs
 echo    Retrieval Service:  http://127.0.0.1:8001
@@ -92,7 +93,7 @@ echo    Retrieval Docs:     http://127.0.0.1:8001/docs
 echo    Ingestion Service:  http://127.0.0.1:8002
 echo    Ingestion Docs:     http://127.0.0.1:8002/docs
 echo    Phoenix Tracing:    http://127.0.0.1:6006
-echo    Frontend:           frontend\index.html
+
 echo.
 echo    Press any key to STOP all services...
 echo ============================================

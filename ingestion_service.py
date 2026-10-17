@@ -714,5 +714,7 @@ def ingest_preview(query: str = "B.Tech CSE fees eligibility", top_k: int = 3) -
 if __name__ == "__main__":
     import uvicorn
 
-    print(f"Starting BMU Ingestion Microservice on http://127.0.0.1:{INGESTION_PORT}...")
-    uvicorn.run("ingestion_service:app", host="127.0.0.1", port=INGESTION_PORT, reload=False)
+    host = os.getenv("INGESTION_HOST", "0.0.0.0")
+    print(f"Starting BMU Ingestion Microservice on http://{host}:{INGESTION_PORT}...")
+    uvicorn.run("ingestion_service:app", host=host, port=INGESTION_PORT, reload=False)
+

@@ -80,6 +80,24 @@ def get_chroma_and_embedder():
     return _chroma_collection, _embedding_model
 
 
+# Local LLM Settings (Ollama / OpenAI-compatible endpoint)
+LOCAL_LLM_URL = os.getenv("LOCAL_LLM_URL", "http://localhost:11434/v1")
+LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "llama3.2")
+LOCAL_LLM_API_KEY = os.getenv("LOCAL_LLM_API_KEY", "ollama")
+
+_local_llm_client = None
+
+
+def get_local_llm_client() -> Tuple[Any, str]:
+    global _local_llm_client
+    model_name = os.getenv("LOCAL_LLM_MODEL", "llama3.2")
+    if _local_llm_client is None:
+        from openai import OpenAI
+
+        _local_llm_client = OpenAI(base_url=LOCAL_LLM_URL, api_key=LOCAL_LLM_API_KEY, timeout=30.0)
+    return _local_llm_client, model_name
+
+
 def get_groq_client(agent_name: str) -> Tuple[Groq, str]:
     if agent_name == "query":
         return Groq(api_key=GROQ_KEY_QUERY), GROQ_MODEL_QUERY
@@ -88,6 +106,16 @@ def get_groq_client(agent_name: str) -> Tuple[Groq, str]:
     elif agent_name == "synthesis":
         return Groq(api_key=GROQ_KEY_SYNTHESIS), GROQ_MODEL_SYNTHESIS
     return Groq(api_key=GLOBAL_GROQ_KEY), "openai/gpt-oss-120b"
+
+
+def get_llm_client(agent_name: str, provider: str = "groq") -> Tuple[Any, str]:
+    if (provider or "").lower() == "local":
+        try:
+            return get_local_llm_client()
+        except Exception as exc:
+            print(f"[Local LLM Warning]: {exc}. Falling back to Groq client.")
+            return get_groq_client(agent_name)
+    return get_groq_client(agent_name)
 
 
 # =====================================================================
@@ -110,6 +138,7 @@ class AgentTraceItem(TypedDict):
 
 class BMURAGState(TypedDict):
     raw_query: str
+    llm_provider: Optional[str]  # "groq" | "local"
 
     # Agent 1 outputs
     optimized_query: str
@@ -177,8 +206,9 @@ def query_specialist_node(state: BMURAGState) -> Dict[str, Any]:
     """
     start_t = time.perf_counter()
     raw_query = state.get("raw_query", "")
+    provider = (state.get("llm_provider") or "groq").lower()
 
-    client, model_name = get_groq_client("query")
+    client, model_name = get_llm_client("query", provider=provider)
 
     prompt = f"""You are the BMU Academic Query Specialist.
 Analyze the user's inquiry regarding BML Munjal University (BMU) and transform it into an optimal search representation.
@@ -237,10 +267,12 @@ Respond strictly with a valid JSON object in this format:
             intent = "courses"
 
     latency_ms = round((time.perf_counter() - start_t) * 1000, 2)
+    provider_tag = "Local Ollama" if provider == "local" else "Groq Cloud"
     trace_item: AgentTraceItem = {
-        "agent": "Agent 1 (QuerySpecialist)",
+        "agent": f"Agent 1 (QuerySpecialist) [{provider_tag}]",
         "latency_ms": latency_ms,
         "details": {
+            "provider": provider,
             "model": model_name,
             "optimized_query": opt_query,
             "keywords": keywords,
@@ -331,15 +363,16 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
             content_text = ""
             if url:
                 try:
-                    downloaded = trafilatura.fetch_url(url)
-                    if downloaded:
-                        extracted = trafilatura.extract(downloaded)
+                    # Fast 3.0s timeout prevents blocking when BMU live links are slow or unreachable
+                    resp_web = requests.get(url, timeout=3.0)
+                    if resp_web.status_code == 200 and resp_web.text:
+                        extracted = trafilatura.extract(resp_web.text)
                         if extracted and len(extracted.strip()) > 100:
                             content_text = extracted[:3500]
                 except Exception:
                     content_text = ""
 
-            # Fallback to Chroma summary if web scrape fails
+            # Instant fallback to high-quality ChromaDB summary
             if not content_text:
                 content_text = item["summary"]
 
@@ -424,11 +457,12 @@ def context_auditor_node(state: BMURAGState) -> Dict[str, Any]:
     content = candidate["content"]
     source_name = candidate["source"]
     is_last_candidate = (idx >= len(candidates) - 1)
+    provider = (state.get("llm_provider") or "groq").lower()
 
-    client, model_name = get_groq_client("context")
+    client, model_name = get_llm_client("context", provider=provider)
 
     prompt = f"""You are the BMU Context Relevance Auditor.
-Assess if the provided Context contains sufficient factual information to answer the Student Question.
+Assess if the provided Context contains factual information to help answer the Student Question.
 
 Student Question: "{raw_query}"
 Candidate Source: {source_name} (Candidate {idx+1} of {len(candidates)})
@@ -437,9 +471,9 @@ Context Excerpt:
 {content[:2500]}
 
 Evaluate carefully:
-- If the context directly answers the question (or contains sufficient factual details to answer the core inquiry), verdict is 'SUFFICIENT'.
-- If the context does not contain the answer, but other candidate pages may exist, verdict is 'TRY_FALLBACK'.
-- If the context proves the information does not exist or is completely unrelated, and no better source is expected, verdict is 'NOT_FOUND'.
+- If the context answers the core question or significant parts of it, verdict is 'SUFFICIENT'.
+- If the context is missing key parts but other candidate pages exist, verdict is 'TRY_FALLBACK'.
+- If the context is completely unrelated or proves the information does not exist, verdict is 'NOT_FOUND'.
 
 Respond strictly with valid JSON:
 {{
@@ -471,6 +505,11 @@ Respond strictly with valid JSON:
         decision = ""
         reason = f"Audit exception fallback: {exc}"
 
+    # If not the last candidate and decision is NOT_FOUND, switch to TRY_FALLBACK to check next candidate
+    if not is_last_candidate and decision == "NOT_FOUND":
+        decision = "TRY_FALLBACK"
+        reason += " (Checking remaining candidate sources)."
+
     # Deterministic fallback check if LLM returned empty or ambiguous decision
     if not decision:
         q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3]
@@ -485,22 +524,24 @@ Respond strictly with valid JSON:
             decision = "TRY_FALLBACK"
             reason = "Heuristic fallback: checking next candidate source."
 
-    # If it is the last candidate and verdict is TRY_FALLBACK, decide conclusively
-    if is_last_candidate and decision == "TRY_FALLBACK":
+    # If it is the last candidate (e.g. combined bundle), accept if relevant keywords match
+    if is_last_candidate:
         q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3]
         matches = [w for w in q_words if w in content.lower()]
-        if len(matches) >= 2 and len(content) > 300:
+        if len(matches) >= 2 and len(content) > 200:
             decision = "SUFFICIENT"
-            reason = f"Conclusive acceptance on final candidate bundle ({', '.join(matches[:3])})."
-        else:
+            reason = f"Conclusive acceptance on knowledge base bundle ({', '.join(matches[:3])})."
+        elif decision == "TRY_FALLBACK":
             decision = "NOT_FOUND"
             reason += " (Exhausted all candidate sources)."
 
     latency_ms = round((time.perf_counter() - start_t) * 1000, 2)
+    provider_tag = "Local Ollama" if provider == "local" else "Groq Cloud"
     trace_item: AgentTraceItem = {
-        "agent": f"Agent 2 (ContextAuditor - Candidate #{idx+1})",
+        "agent": f"Agent 2 (ContextAuditor - Candidate #{idx+1}) [{provider_tag}]",
         "latency_ms": latency_ms,
         "details": {
+            "provider": provider,
             "model": model_name,
             "candidate_source": source_name,
             "decision": decision,
@@ -522,9 +563,12 @@ Respond strictly with valid JSON:
 def route_after_context_audit(state: BMURAGState) -> str:
     """Conditional Edge: Routes to synthesis, fallback iteration, or refusal."""
     decision = state.get("audit_decision", "NOT_FOUND")
+    idx = state.get("current_candidate_idx", 0)
+    candidates = state.get("candidates", [])
+
     if decision == "SUFFICIENT":
         return "synthesize"
-    elif decision == "TRY_FALLBACK":
+    if idx < len(candidates) - 1:
         return "advance_candidate"
     return "handle_not_found"
 
@@ -578,8 +622,9 @@ def response_synthesizer_node(state: BMURAGState) -> Dict[str, Any]:
     start_t = time.perf_counter()
     raw_query = state.get("raw_query", "")
     vetted_context = state.get("vetted_context", "")
+    provider = (state.get("llm_provider") or "groq").lower()
 
-    client, model_name = get_groq_client("synthesis")
+    client, model_name = get_llm_client("synthesis", provider=provider)
 
     prompt = f"""You are the official BMU Academic Assistant for BML Munjal University.
 
@@ -612,13 +657,37 @@ Question:
         )
         answer = response.choices[0].message.content or "Not found in context"
     except Exception as exc:
-        answer = f"Unable to generate response due to service error: {exc}"
+        if provider == "local":
+            print(f"[Local LLM Fallback]: Local model unavailable ({exc}). Seamlessly routing to Groq Cloud synthesis.")
+            fallback_client, fallback_model = get_groq_client("synthesis")
+            try:
+                fb_resp = fallback_client.chat.completions.create(
+                    model=fallback_model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are the official BMU Academic Assistant. Answer strictly from context.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.2,
+                    max_tokens=800,
+                )
+                answer = fb_resp.choices[0].message.content or "Not found in context"
+                provider = "groq (fallback)"
+            except Exception as inner_exc:
+                answer = f"Unable to generate response due to service error: {inner_exc}"
+        else:
+            answer = f"Unable to generate response due to service error: {exc}"
 
     latency_ms = round((time.perf_counter() - start_t) * 1000, 2)
+    provider_tag = "Local Ollama" if provider == "local" else ("Groq Cloud (Local Fallback)" if "fallback" in provider else "Groq Cloud")
+
     trace_item: AgentTraceItem = {
-        "agent": "Agent 3 (ResponseSynthesizer)",
+        "agent": f"Agent 3 (ResponseSynthesizer) [{provider_tag}]",
         "latency_ms": latency_ms,
         "details": {
+            "provider": provider,
             "model": model_name,
             "answer_length": len(answer),
         },

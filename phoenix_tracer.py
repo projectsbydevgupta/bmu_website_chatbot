@@ -34,8 +34,15 @@ def init_phoenix_tracing(
     # Check config
     proj = project_name or os.getenv("PHOENIX_PROJECT") or os.getenv("PHOENIX_PROJECT_NAME", "bmu-website-chatbot")
     ep = endpoint or os.getenv("PHOENIX_COLLECTOR_ENDPOINT") or os.getenv("PHOENIX_ENDPOINT", "http://localhost:6006")
-    if not ep.endswith("/v1/traces"):
-        ep = ep.rstrip("/") + "/v1/traces"
+    # Quick probe: only register if Phoenix server is running to prevent export retry delays
+    try:
+        import urllib.request
+        base_ep = ep.replace("/v1/traces", "")
+        with urllib.request.urlopen(base_ep, timeout=0.4):
+            pass
+    except Exception:
+        logger.info("[Phoenix Tracing] Phoenix server is offline. Skipping trace export.")
+        return False
 
     try:
         from phoenix.otel import register

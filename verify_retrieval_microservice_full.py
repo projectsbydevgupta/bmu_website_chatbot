@@ -20,9 +20,10 @@ from dotenv import load_dotenv
 # Reconfigure stdout for utf-8
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT_DIR = r"d:\BMU_WEBSITE_CHATBOT-main\BMU_WEBSITE_CHATBOT-main"
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT_DIR)
 load_dotenv(dotenv_path=os.path.join(ROOT_DIR, ".env"))
+
 
 BACKEND_URL = "http://127.0.0.1:8000"
 RETRIEVAL_URL = "http://127.0.0.1:8001"
