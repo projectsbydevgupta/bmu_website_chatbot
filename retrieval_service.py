@@ -54,6 +54,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def startup_prewarm():
+    """Pre-warms ChromaDB connection and embedding model on boot so first request is instant."""
+    try:
+        print("[Retrieval Service] Pre-warming embedding model and Chroma collection...")
+        get_prod_collection()
+        get_embedder()
+        print("[Retrieval Service] Pre-warming complete - service is 100% ready!")
+    except Exception as exc:
+        print(f"[Retrieval Service] Pre-warming warning: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # Lazy Loaded Resources
 # ---------------------------------------------------------------------------

@@ -314,7 +314,7 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
         resp = requests.post(
             f"{RETRIEVAL_SERVICE_URL}/retrieve",
             json={"query": opt_query, "top_k": 8},
-            timeout=10,
+            timeout=35,
         )
         if resp.status_code == 200:
             data = resp.json()
@@ -330,8 +330,9 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
     if not ranked:
         try:
             collection, embedder = get_chroma_and_embedder()
-            query_emb = embedder.encode([opt_query]).tolist()
-            results = collection.query(query_embeddings=query_emb, n_results=8)
+            if embedder is not None:
+                query_emb = embedder.encode([opt_query]).tolist()
+                results = collection.query(query_embeddings=query_emb, n_results=8)
             documents = results.get("documents", [[]])[0]
             metadatas = results.get("metadatas", [[]])[0]
             distances = results.get("distances", [[]])[0]
