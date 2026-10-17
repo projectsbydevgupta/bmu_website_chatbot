@@ -4,9 +4,12 @@
 [![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-FF6F00.svg)](https://langchain-ai.github.io/langgraph/)
 [![Groq Cloud](https://img.shields.io/badge/Groq-LPU%20Inference-F55036.svg)](https://groq.com/)
 [![Ollama Local](https://img.shields.io/badge/Ollama-Local%20Llama%203.2-000000.svg)](https://ollama.com/)
+[![Presentation](https://img.shields.io/badge/Presentation-Executive%20Slide%20Deck%20(PDF)-E25555.svg?logo=adobeacrobatreader&logoColor=white)](docs/BMU_Website_Chatbot_Presentation.pdf)
 [![Google Stitch MCP](https://img.shields.io/badge/Stitch%20MCP-Obsidian%20Telemetry-4285F4.svg)](https://stitch.googleapis.com)
 
 An enterprise-grade, institutional AI Chatbot tailored specifically for **BML Munjal University (BMU)**. Engineered with a decoupled **microservices architecture**, an autonomous 3-agent **LangGraph** state machine, a two-stage **JEV Guardrails** security and hallucination mitigation engine, dual-engine LLM runtime (**Groq Cloud LPU** vs. **Local Ollama**), and an interactive **100-Question Benchmark Observatory Dashboard** designed with **Google Stitch MCP**.
+
+> 📑 **Official Presentation:** View or download the complete slide deck: [BMU Website Chatbot Presentation (PDF)](docs/BMU_Website_Chatbot_Presentation.pdf).
 
 ---
 
@@ -761,6 +764,9 @@ BMU_WEBSITE_CHATBOT-main/
 ├── run_100_evaluation.py             # Dual-model benchmark runner & RAGAS evaluator
 ├── run_100_query_evaluation.py       # Legacy wrapper script
 ├── evaluate_metrics.py               # RAGAS metric mathematical scoring functions
+│
+├── docs/                             # Project Documentation & Assets
+│   └── BMU_Website_Chatbot_Presentation.pdf # Official project presentation deck
 │
 ├── frontend/                         # User Interfaces
 │   ├── index.html                    # Chat Assistant main interface
