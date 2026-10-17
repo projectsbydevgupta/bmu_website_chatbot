@@ -62,22 +62,26 @@ _embedding_model = None
 
 
 def get_chroma_and_embedder():
-    """Lazily loads local Chroma and SentenceTransformer only as an in-process fallback."""
-    global _chroma_collection, _embedding_model
-    if _chroma_collection is None:
-        import chromadb
+    """Lazily loads local Chroma and SentenceTransformer from shared retrieval_service singleton."""
+    try:
+        from retrieval_service import get_chroma_and_embedder as _service_get_ce
+        return _service_get_ce()
+    except Exception:
+        global _chroma_collection, _embedding_model
+        if _chroma_collection is None:
+            import chromadb
 
-        client = chromadb.CloudClient(
-            api_key=CHROMA_API_KEY,
-            tenant=CHROMA_TENANT,
-            database=CHROMA_DATABASE,
-        )
-        _chroma_collection = client.get_or_create_collection(name=COLLECTION_NAME)
-    if _embedding_model is None:
-        from sentence_transformers import SentenceTransformer
+            client = chromadb.CloudClient(
+                api_key=CHROMA_API_KEY,
+                tenant=CHROMA_TENANT,
+                database=CHROMA_DATABASE,
+            )
+            _chroma_collection = client.get_or_create_collection(name=COLLECTION_NAME)
+        if _embedding_model is None:
+            from sentence_transformers import SentenceTransformer
 
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    return _chroma_collection, _embedding_model
+            _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        return _chroma_collection, _embedding_model
 
 
 # Local LLM Settings (Ollama / OpenAI-compatible endpoint)
@@ -309,24 +313,37 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
     retrieval_mode = "microservice"
     retrieval_warning = None
 
-    # 1. Primary path: Call Retrieval Microservice over HTTP
+    # 1. Primary path: If Retrieval Microservice is reachable over HTTP, call it
     try:
         resp = requests.post(
             f"{RETRIEVAL_SERVICE_URL}/retrieve",
             json={"query": opt_query, "top_k": 8},
-            timeout=35,
+            timeout=5,
         )
         if resp.status_code == 200:
             data = resp.json()
             ranked = data.get("results", [])
+            retrieval_mode = "microservice"
         else:
             retrieval_warning = f"Microservice HTTP {resp.status_code}: {resp.text}"
-            retrieval_mode = "in_process_fallback"
     except Exception as exc:
-        retrieval_warning = f"Microservice connection failed: {exc}"
-        retrieval_mode = "in_process_fallback"
+        retrieval_warning = f"Microservice connection skipped/failed: {exc}"
 
-    # 2. Resilient fallback: Query local ChromaDB if microservice failed
+    # 2. Resilient unified path: Direct in-process retrieval (optimal for cloud containers)
+    if not ranked:
+        try:
+            from retrieval_service import retrieve, RetrieveRequest
+            engine_type = os.getenv("RETRIEVAL_ENGINE", "minilm").lower()
+            res = retrieve(RetrieveRequest(query=opt_query, top_k=8, engine=engine_type))
+            ranked = [
+                doc.model_dump() if hasattr(doc, "model_dump") else doc.dict()
+                for doc in res.results
+            ]
+            retrieval_mode = "in_process"
+        except Exception as in_proc_exc:
+            retrieval_warning = f"{retrieval_warning}; In-process retrieval failed: {in_proc_exc}"
+
+    # 3. Last-resort fallback: Direct Chroma collection query
     if not ranked:
         try:
             collection, embedder = get_chroma_and_embedder()
@@ -347,6 +364,7 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
                     "score": float(final_sc),
                 })
             ranked.sort(key=lambda x: x["score"], reverse=True)
+            retrieval_mode = "in_process_fallback"
         except Exception as fb_exc:
             retrieval_warning = f"{retrieval_warning}; Fallback also failed: {fb_exc}"
 
