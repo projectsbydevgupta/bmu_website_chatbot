@@ -245,7 +245,7 @@ Respond strictly with a valid JSON object in this format:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,
-            max_tokens=600,
+            max_tokens=250,
         )
         content = (response.choices[0].message.content or "").strip()
         parsed = _safe_json_parse(content)
@@ -313,23 +313,24 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
     retrieval_mode = "microservice"
     retrieval_warning = None
 
-    # 1. Primary path: If Retrieval Microservice is reachable over HTTP, call it
-    try:
-        resp = requests.post(
-            f"{RETRIEVAL_SERVICE_URL}/retrieve",
-            json={"query": opt_query, "top_k": 8},
-            timeout=5,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            ranked = data.get("results", [])
-            retrieval_mode = "microservice"
-        else:
-            retrieval_warning = f"Microservice HTTP {resp.status_code}: {resp.text}"
-    except Exception as exc:
-        retrieval_warning = f"Microservice connection skipped/failed: {exc}"
+    # 1. Primary path: If external Retrieval Microservice is explicitly configured and running
+    if RETRIEVAL_SERVICE_URL and RETRIEVAL_SERVICE_URL.strip() not in ["", "none", "in_process", "in-process", "http://127.0.0.1:8001"]:
+        try:
+            resp = requests.post(
+                f"{RETRIEVAL_SERVICE_URL.rstrip('/')}/retrieve",
+                json={"query": opt_query, "top_k": 8},
+                timeout=1.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                ranked = data.get("results", [])
+                retrieval_mode = "microservice"
+            else:
+                retrieval_warning = f"Microservice HTTP {resp.status_code}: {resp.text}"
+        except Exception as exc:
+            retrieval_warning = f"Microservice connection skipped: {exc}"
 
-    # 2. Resilient unified path: Direct in-process retrieval (optimal for cloud containers)
+    # 2. Resilient unified path: Direct in-process retrieval (optimal for cloud containers & instant speed)
     if not ranked:
         try:
             from retrieval_service import retrieve, RetrieveRequest
@@ -371,29 +372,25 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
     candidates: List[CandidateContext] = []
     top_results: List[Dict[str, Any]] = []
 
-    # If top score is above threshold, construct candidate sources
+    # If top score is above threshold, construct candidate sources instantly from high-quality Chroma summaries
     if ranked and ranked[0]["score"] >= 0.10:
-        # Pre-fetch candidate pages (up to 2 live URLs)
+        enable_scraping = os.getenv("ENABLE_LIVE_SCRAPING", "false").lower() == "true"
         for i, item in enumerate(ranked[:2]):
             url = item["url"]
             score = item["score"]
             top_results.append({"url": url, "score": score})
 
-            content_text = ""
-            if url:
+            content_text = item["summary"]
+            # Optional live scraping: only if explicitly enabled (cloud defaults to instant cached summaries)
+            if enable_scraping and url:
                 try:
-                    # Fast 3.0s timeout prevents blocking when BMU live links are slow or unreachable
-                    resp_web = requests.get(url, timeout=3.0)
+                    resp_web = requests.get(url, timeout=1.5)
                     if resp_web.status_code == 200 and resp_web.text:
                         extracted = trafilatura.extract(resp_web.text)
                         if extracted and len(extracted.strip()) > 100:
                             content_text = extracted[:3500]
                 except Exception:
-                    content_text = ""
-
-            # Instant fallback to high-quality ChromaDB summary
-            if not content_text:
-                content_text = item["summary"]
+                    pass
 
             candidates.append({
                 "source": url or f"Chroma Document #{i+1}",
@@ -512,7 +509,7 @@ Respond strictly with valid JSON:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,
-            max_tokens=600,
+            max_tokens=120,
         )
         content_str = (response.choices[0].message.content or "").strip()
         parsed = _safe_json_parse(content_str)

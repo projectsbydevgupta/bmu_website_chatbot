@@ -43,6 +43,18 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def startup_prewarm():
+    """Pre-warm embedding model and ChromaDB connection on boot for instant first-query response."""
+    try:
+        from retrieval_service import get_chroma_and_embedder
+        get_chroma_and_embedder()
+        print("[Unified Backend] Embedding and Chroma resources pre-warmed successfully.")
+    except Exception as exc:
+        print(f"[Unified Backend] Startup pre-warm notice: {exc}")
+
+
+
 class AskRequest(BaseModel):
     query: str = Field(..., min_length=1, description="User question")
     llm_provider: Optional[str] = Field("groq", description="groq | local")
