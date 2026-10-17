@@ -64,12 +64,32 @@ def init_phoenix_tracing(
         return False
 
 
+class _DummySpan:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def set_attribute(self, *args, **kwargs):
+        pass
+
+
+class _DummyTracer:
+    def start_as_current_span(self, *args, **kwargs):
+        return _DummySpan()
+
+
 def get_tracer():
-    """Returns the global OpenTelemetry tracer for custom spans."""
+    """Returns the global OpenTelemetry tracer for custom spans, or a no-op fallback."""
     global _tracer
     if not _is_initialized:
         init_phoenix_tracing()
     if _tracer is None:
-        from opentelemetry import trace
-        _tracer = trace.get_tracer("bmu_rag_chatbot")
+        try:
+            from opentelemetry import trace
+            _tracer = trace.get_tracer("bmu_rag_chatbot")
+        except Exception:
+            _tracer = _DummyTracer()
     return _tracer
+
