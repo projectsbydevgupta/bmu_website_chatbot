@@ -11,10 +11,26 @@ from pydantic import BaseModel, Field
 
 from jev_guardrails import jev_guardrail
 from bmu_rag_graph import bmu_rag_app, BMURAGState
-from phoenix_tracer import init_phoenix_tracing, get_tracer
 
 load_dotenv()
-init_phoenix_tracing()
+
+try:
+    from phoenix_tracer import init_phoenix_tracing, get_tracer
+    init_phoenix_tracing()
+except Exception:
+    def get_tracer():
+        class _NoOpSpan:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+            def set_attribute(self, *args, **kwargs):
+                pass
+        class _NoOpTracer:
+            def start_as_current_span(self, *args, **kwargs):
+                return _NoOpSpan()
+        return _NoOpTracer()
+
 
 app = FastAPI(title="BMU Multi-Agent Semantic QA API (LangGraph + JEV)", version="2.0.0")
 
