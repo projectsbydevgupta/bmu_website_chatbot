@@ -209,9 +209,15 @@ A dedicated retrieval engine optimized strictly for dense vector embedding gener
    }
    ```
    The service encodes the text into a 384-dimensional dense vector.
-3. **Hybrid Scoring Algorithm:**
-   Computes a combined score combining semantic vector cosine similarity with exact keyword matching:
+3. **Normalized Hybrid Scoring & Authority Algorithm:**
+   Computes a combined score balancing semantic vector similarity with normalized domain keyword matching:
    $$\text{Final Score} = (0.68 \times \text{Cosine Similarity}) + (0.32 \times \text{Keyword Overlap})$$
+   
+   - **Academic Acronym Normalization:** Normalizes academic degree formats (e.g., `B.Tech`, `b-tech`, `b tech` $\rightarrow$ `btech`; `M.Tech` $\rightarrow$ `mtech`; `MBA` $\rightarrow$ `mba`; `CSE` $\rightarrow$ `cse`) so colloquial search matches official registry tables.
+   - **Conversational Stopword Elimination:** Filters common conversational fillers (`what`, `is`, `are`, `tell`, `how`, etc.) preventing general marketing blogs from accumulating false-positive overlap scores.
+   - **Morphological Stemming:** Stems recurring institutional terms (`fees`/`tuition` $\rightarrow$ `fee`; `hostels` $\rightarrow$ `hostel`; `admissions` $\rightarrow$ `admission`; `courses`/`programs` $\rightarrow$ `course`).
+   - **Canonical Path Authority Weighting:** Multi-token matching over document text, title, and URL path segments. Official canonical pages (e.g., `/courses/`, `/fee-structure/`, `/admission/`) receive a **1.25x priority boost**, while marketing blog posts (`/social/`, `/blogs/`) receive a **0.65x damping factor**, ensuring official fee tables rank above promotional articles.
+   - **Guardrails OFF Dynamic Fallback:** When JEV Guardrails are disabled, queries outside BMU institutional scope (e.g., "who is president of india") or queries lacking verified records automatically fall back to unconstrained LLM generation with clean references, preventing misleading institutional citations.
 4. **Response Payload:** Returns ranked candidate chunks with exact source URLs, titles, and text contents.
 
 ---

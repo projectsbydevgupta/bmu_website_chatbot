@@ -168,16 +168,82 @@ class BMURAGState(TypedDict):
 
 
 # =====================================================================
-# Helper Utilities
+# Helper Utilities & Domain Lexicon
 # =====================================================================
 
-def _keyword_score(query: str, text: str) -> float:
-    query_words = set(re.findall(r"\w+", query.lower()))
-    text_words = set(re.findall(r"\w+", text.lower()))
-    if not query_words:
+STOPWORDS = {
+    "what", "is", "are", "the", "a", "an", "in", "on", "at", "for", "to", "of",
+    "and", "or", "with", "by", "from", "about", "can", "you", "tell", "me",
+    "how", "much", "does", "do", "i", "my", "we", "our", "bmu", "who", "which",
+    "give", "please", "want", "know"
+}
+
+ACRONYM_MAP = {
+    "b.tech": "btech", "b-tech": "btech", "b tech": "btech",
+    "m.tech": "mtech", "m-tech": "mtech", "m tech": "mtech",
+    "bba": "bba", "b.b.a": "bba", "mba": "mba", "m.b.a": "mba",
+    "b.com": "bcom", "bcom": "bcom", "cse": "cse", "c.s.e": "cse",
+    "ece": "ece", "e.c.e": "ece",
+}
+
+
+def _normalize_text(text: str) -> str:
+    t = (text or "").lower()
+    for k, v in ACRONYM_MAP.items():
+        t = t.replace(k, v)
+    return t
+
+
+def _stem_token(word: str) -> str:
+    w = word.lower().strip()
+    if w in ("fees", "tuition"):
+        return "fee"
+    if w in ("hostels",):
+        return "hostel"
+    if w in ("admissions",):
+        return "admission"
+    if w in ("courses", "programmes", "programs"):
+        return "course"
+    if w in ("placements",):
+        return "placement"
+    if w in ("scholarships",):
+        return "scholarship"
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+def _extract_tokens(text: str) -> set:
+    norm = _normalize_text(text)
+    words = re.findall(r"[a-z0-9]+", norm)
+    tokens = set()
+    for w in words:
+        if w not in STOPWORDS and len(w) > 1:
+            tokens.add(_stem_token(w))
+    return tokens
+
+
+def _keyword_score(query: str, text: str, url: str = "", title: str = "") -> float:
+    """Calculates normalized keyword match ratio between query and candidate document/URL/title."""
+    q_tokens = _extract_tokens(query)
+    if not q_tokens:
         return 0.0
-    overlap = query_words.intersection(text_words)
-    return len(overlap) / len(query_words)
+
+    url_clean = (url or "").replace("-", " ").replace("/", " ").replace(".", " ")
+    combined = f"{text or ''} {url_clean} {title or ''}"
+    d_tokens = _extract_tokens(combined)
+
+    overlap = q_tokens.intersection(d_tokens)
+    base_score = len(overlap) / len(q_tokens)
+
+    # Authority adjustments: prioritize official portal/course/fee pages over marketing blog posts
+    url_low = (url or "").lower()
+    if "/social/" in url_low or "/blogs/" in url_low:
+        base_score *= 0.65
+    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/"]):
+        base_score = min(1.0, base_score * 1.25)
+
+    return round(base_score, 4)
 
 
 def _safe_json_parse(text: str) -> Dict[str, Any]:
@@ -245,7 +311,7 @@ Respond strictly with a valid JSON object in this format:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,
-            max_tokens=250,
+            max_tokens=600,
         )
         content = (response.choices[0].message.content or "").strip()
         parsed = _safe_json_parse(content)
@@ -350,14 +416,14 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
             collection, embedder = get_chroma_and_embedder()
             if embedder is not None:
                 query_emb = embedder.encode([opt_query]).tolist()
-                results = collection.query(query_embeddings=query_emb, n_results=8)
+                results = collection.query(query_embeddings=query_emb, n_results=16)
             documents = results.get("documents", [[]])[0]
             metadatas = results.get("metadatas", [[]])[0]
             distances = results.get("distances", [[]])[0]
 
             for doc, meta, dist in zip(documents, metadatas, distances):
                 sem_sim = max(0.0, 1.0 - dist)
-                kw_sc = _keyword_score(opt_query, doc)
+                kw_sc = _keyword_score(opt_query, doc, url=meta.get("url", ""), title=meta.get("title", ""))
                 final_sc = (0.68 * sem_sim) + (0.32 * kw_sc)
                 ranked.append({
                     "summary": doc,
@@ -509,7 +575,7 @@ Respond strictly with valid JSON:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,
-            max_tokens=120,
+            max_tokens=400,
         )
         content_str = (response.choices[0].message.content or "").strip()
         parsed = _safe_json_parse(content_str)
@@ -527,10 +593,11 @@ Respond strictly with valid JSON:
         reason += " (Checking remaining candidate sources)."
 
     # Deterministic fallback check if LLM returned empty or ambiguous decision
+    cand_score = float(candidate.get("score", 0.0))
     if not decision:
-        q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3]
+        q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3 and w.lower() not in STOPWORDS]
         matches = [w for w in q_words if w in content.lower()]
-        if len(matches) >= 2 and len(content) > 300:
+        if len(matches) >= 2 and len(content) > 300 and cand_score >= 0.18:
             decision = "SUFFICIENT"
             reason = f"Heuristic acceptance: verified factual match on {', '.join(matches[:3])}."
         elif is_last_candidate:
@@ -542,9 +609,9 @@ Respond strictly with valid JSON:
 
     # If it is the last candidate (e.g. combined bundle), accept if relevant keywords match
     if is_last_candidate:
-        q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3]
+        q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3 and w.lower() not in STOPWORDS]
         matches = [w for w in q_words if w in content.lower()]
-        if len(matches) >= 2 and len(content) > 200:
+        if len(matches) >= 2 and len(content) > 200 and cand_score >= 0.18:
             decision = "SUFFICIENT"
             reason = f"Conclusive acceptance on knowledge base bundle ({', '.join(matches[:3])})."
         elif decision == "TRY_FALLBACK":

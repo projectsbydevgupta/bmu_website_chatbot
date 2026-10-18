@@ -195,14 +195,79 @@ class HealthResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Ranking Logic
 # ---------------------------------------------------------------------------
-def _keyword_score(query: str, text: str) -> float:
-    """Calculates word overlap ratio between query and candidate text."""
-    query_words = set(re.findall(r"\w+", query.lower()))
-    text_words = set(re.findall(r"\w+", text.lower()))
-    if not query_words:
+STOPWORDS = {
+    "what", "is", "are", "the", "a", "an", "in", "on", "at", "for", "to", "of",
+    "and", "or", "with", "by", "from", "about", "can", "you", "tell", "me",
+    "how", "much", "does", "do", "i", "my", "we", "our", "bmu", "who", "which",
+    "give", "please", "want", "know"
+}
+
+ACRONYM_MAP = {
+    "b.tech": "btech", "b-tech": "btech", "b tech": "btech",
+    "m.tech": "mtech", "m-tech": "mtech", "m tech": "mtech",
+    "bba": "bba", "b.b.a": "bba", "mba": "mba", "m.b.a": "mba",
+    "b.com": "bcom", "bcom": "bcom", "cse": "cse", "c.s.e": "cse",
+    "ece": "ece", "e.c.e": "ece",
+}
+
+
+def _normalize_text(text: str) -> str:
+    t = (text or "").lower()
+    for k, v in ACRONYM_MAP.items():
+        t = t.replace(k, v)
+    return t
+
+
+def _stem_token(word: str) -> str:
+    w = word.lower().strip()
+    if w in ("fees", "tuition"):
+        return "fee"
+    if w in ("hostels",):
+        return "hostel"
+    if w in ("admissions",):
+        return "admission"
+    if w in ("courses", "programmes", "programs"):
+        return "course"
+    if w in ("placements",):
+        return "placement"
+    if w in ("scholarships",):
+        return "scholarship"
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+def _extract_tokens(text: str) -> set:
+    norm = _normalize_text(text)
+    words = re.findall(r"[a-z0-9]+", norm)
+    tokens = set()
+    for w in words:
+        if w not in STOPWORDS and len(w) > 1:
+            tokens.add(_stem_token(w))
+    return tokens
+
+
+def _keyword_score(query: str, text: str, url: str = "", title: str = "") -> float:
+    """Calculates normalized keyword match ratio between query and candidate document/URL/title."""
+    q_tokens = _extract_tokens(query)
+    if not q_tokens:
         return 0.0
-    overlap = query_words.intersection(text_words)
-    return len(overlap) / len(query_words)
+
+    url_clean = (url or "").replace("-", " ").replace("/", " ").replace(".", " ")
+    combined = f"{text or ''} {url_clean} {title or ''}"
+    d_tokens = _extract_tokens(combined)
+
+    overlap = q_tokens.intersection(d_tokens)
+    base_score = len(overlap) / len(q_tokens)
+
+    # Authority adjustments: prioritize official portal/course/fee pages over marketing blog posts
+    url_low = (url or "").lower()
+    if "/social/" in url_low or "/blogs/" in url_low:
+        base_score *= 0.65
+    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/"]):
+        base_score = min(1.0, base_score * 1.25)
+
+    return round(base_score, 4)
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +331,7 @@ def retrieve(req: RetrieveRequest) -> RetrieveResponse:
 
     try:
         ranked: List[RankedDocument] = []
-        n_fetch = min(max(req.top_k, 8), 25)
+        n_fetch = min(max(req.top_k * 2, 16), 35)
 
         if engine == "voyage":
             # =========================================================
@@ -285,7 +350,7 @@ def retrieve(req: RetrieveRequest) -> RetrieveResponse:
 
             for doc, meta, dist in zip(documents, metadatas, distances):
                 sem_sim = max(0.0, 1.0 - dist)
-                kw_sc = _keyword_score(clean_query, doc)
+                kw_sc = _keyword_score(clean_query, doc, url=meta.get("url", ""), title=meta.get("title", ""))
                 final_sc = (0.68 * sem_sim) + (0.32 * kw_sc)
 
                 ranked.append(
@@ -315,7 +380,7 @@ def retrieve(req: RetrieveRequest) -> RetrieveResponse:
 
             for doc, meta, dist in zip(documents, metadatas, distances):
                 sem_sim = max(0.0, 1.0 - dist)
-                kw_sc = _keyword_score(clean_query, doc)
+                kw_sc = _keyword_score(clean_query, doc, url=meta.get("url", ""), title=meta.get("title", ""))
                 final_sc = (0.68 * sem_sim) + (0.32 * kw_sc)
 
                 ranked.append(

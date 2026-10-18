@@ -191,8 +191,29 @@ def _build_answer_internal(
 
     # If guardrails are toggled OFF: answer freely even if outside BMU institutional context
     if not enable_guardrails:
-        if graph_result.get("audit_decision") == "NOT_FOUND" or not vetted_context:
+        unconstrained_triggers = [
+            "not specified in the current records",
+            "not specified in the provided",
+            "could not find",
+            "not found in context",
+            "current records do not specify",
+            "does not specify",
+            "no information",
+            "cannot find",
+            "not mention",
+            "not available in the records",
+            "unable to find",
+        ]
+        top_sc = ranked_urls[0].score if ranked_urls else 0.0
+        needs_unconstrained = (
+            graph_result.get("audit_decision") == "NOT_FOUND"
+            or not vetted_context
+            or any(t in raw_answer.lower() for t in unconstrained_triggers)
+            or (top_sc < 0.20 and any(kw in query.lower() for kw in ["who", "what", "where", "when", "why", "how", "tell", "explain"]))
+        )
+        if needs_unconstrained:
             raw_answer = _generate_unconstrained_answer(query, provider)
+            ranked_urls = []
             agent_trace.append({
                 "agent": f"UnconstrainedSynthesizer [{provider.upper()}]",
                 "latency_ms": 0.0,

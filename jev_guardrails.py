@@ -40,6 +40,51 @@ try:
 except ImportError:
     TYPESAFE_SDK_AVAILABLE = False
 
+    class NoulAnswer(BaseModel):
+        type: str = "noul"
+        noul: float = 0.0
+
+    class ChoiceAnswer(BaseModel):
+        type: str = "choice"
+        choice: str = ""
+        confidence: float = 1.0
+        probabilities: Dict[str, float] = Field(default_factory=dict)
+
+    class ScoreAnswer(BaseModel):
+        type: str = "score"
+        score: float = 0.0
+
+    class Usage(BaseModel):
+        input_tokens: int = 0
+        output_tokens: int = 0
+
+    class SystemOneResponse(BaseModel):
+        model: str = "jev-system-one-local"
+        usage: Usage = Field(default_factory=Usage)
+        answers: Dict[str, Any] = Field(default_factory=dict)
+
+        @property
+        def nouls(self) -> Dict[str, NoulAnswer]:
+            return {k: v for k, v in self.answers.items() if isinstance(v, NoulAnswer)}
+
+        @property
+        def choices(self) -> Dict[str, ChoiceAnswer]:
+            return {k: v for k, v in self.answers.items() if isinstance(v, ChoiceAnswer)}
+
+    class Noul(BaseModel):
+        instructions: str
+
+    class Choice(BaseModel):
+        instructions: str
+        criteria: Dict[str, str] = Field(default_factory=dict)
+
+    class Score(BaseModel):
+        instructions: str
+
+    class TypeSafeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
 load_dotenv()
 TYPESAFE_API_KEY = os.getenv("TYPESAFE_API_KEY", "").strip()
 
@@ -104,10 +149,16 @@ BMU_KEYWORDS = {
 }
 
 OUT_OF_SCOPE_KEYWORDS = {
-    "recipe", "cake", "cook", "cooking", "fifa", "cricket score", "bitcoin",
-    "cryptocurrency", "stock market", "weather in", "movie review", "netflix",
-    "fortnite", "minecraft", "playstation", "dating", "horoscope", "zodiac"
+    "recipe", "cake", "cook", "cooking", "fifa", "cricket", "bitcoin",
+    "cryptocurrency", "stock", "weather", "netflix", "fortnite", "minecraft",
+    "playstation", "dating", "horoscope", "zodiac"
 }
+
+OUT_OF_SCOPE_PHRASES = [
+    "president of", "prime minister", "capital of", "weather in", "weather of",
+    "cricket score", "stock price", "stock market", "movie review", "who is the pm",
+    "who is pm", "lyrics of", "song lyrics", "cheat code"
+]
 
 
 class JevGuardrail:
@@ -157,6 +208,7 @@ class JevGuardrail:
         words = set(re.findall(r"\w+", q_lower))
         bmu_overlap = words.intersection(BMU_KEYWORDS)
         out_overlap = words.intersection(OUT_OF_SCOPE_KEYWORDS)
+        is_phrase_out_of_scope = any(p in q_lower for p in OUT_OF_SCOPE_PHRASES)
 
         intent_choice = "bmu_academic"
         intent_conf = 0.85
@@ -168,10 +220,10 @@ class JevGuardrail:
         elif toxic_score > 0.8:
             intent_choice = "toxic"
             intent_conf = 0.95
-        elif out_overlap and not bmu_overlap:
+        elif (out_overlap or is_phrase_out_of_scope) and not bmu_overlap:
             intent_choice = "out_of_scope"
-            intent_conf = 0.92
-            probs = {"bmu_academic": 0.03, "general_academic": 0.05, "out_of_scope": 0.92}
+            intent_conf = 0.94
+            probs = {"bmu_academic": 0.02, "general_academic": 0.04, "out_of_scope": 0.94}
         elif bmu_overlap:
             intent_choice = "bmu_academic"
             intent_conf = 0.95

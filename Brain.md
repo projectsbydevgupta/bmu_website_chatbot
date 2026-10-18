@@ -303,9 +303,14 @@ Retrieves candidate documents, performs hybrid ranking, and constructs candidate
    - If the microservice is down, unreachable, or times out, it switches `retrieval_mode` to `"in_process_fallback"`.
    - Lazily loads local `SentenceTransformer("all-MiniLM-L6-v2")` and `chromadb.CloudClient` via `get_chroma_and_embedder()`.
    - Embeds query: `query_emb = embedder.encode([opt_query]).tolist()`.
-   - Queries collection `bmu_summaries` for 8 nearest neighbors.
-   - Calculates hybrid score for each document:
+   - Queries collection `bmu_summaries` for up to 16 nearest neighbors (expanded pool for hybrid re-ranking).
+   - Calculates normalized hybrid score for each document:
      $$\text{HybridScore} = 0.68 \times (1.0 - \text{distance}) + 0.32 \times \text{KeywordScore}$$
+     where `KeywordScore` executes:
+     - **Acronym Normalization:** Normalizes academic variants (`b.tech`, `b-tech`, `b tech` $\rightarrow$ `btech`; `m.tech` $\rightarrow$ `mtech`; `mba` $\rightarrow$ `mba`; `cse` $\rightarrow$ `cse`).
+     - **Stopword Filtration:** Removes conversational fillers (`what`, `is`, `are`, `tell`, `how`, etc.) to prevent false overlaps on lengthy blog articles.
+     - **Morphological Stemming:** Stems domain terms (`fees`/`tuition` $\rightarrow$ `fee`; `hostels` $\rightarrow$ `hostel`; `admissions` $\rightarrow$ `admission`; `courses` $\rightarrow$ `course`).
+     - **Canonical URL Authority Scaling:** Evaluates text + URL tokens. Canonical portal directories (`/courses/`, `/fee-structure/`, `/admission/`) receive a $1.25\times$ multiplier; marketing blogs (`/social/`, `/blogs/`) receive a $0.65\times$ damping factor.
    - Sorts results by score descending.
 3. **Threshold Gate (`0.10`):**
    - If `top_score < 0.10`, the query is flagged as low similarity, skipping live web scraping and candidate construction.
@@ -577,8 +582,11 @@ class OutputGuardrailDecision(BaseModel):
 #### Academic Domain Keywords (45+ terms):
 `bmu`, `bml`, `munjal`, `admission`, `admissions`, `course`, `courses`, `fee`, `fees`, `btech`, `b.tech`, `mba`, `bba`, `law`, `bba-llb`, `hostel`, `hostels`, `placement`, `placements`, `salary`, `package`, `faculty`, `professor`, `professors`, `campus`, `scholarship`, `scholarships`, `exam`, `exams`, `cutoff`, `eligibility`, `chancellor`, `vice chancellor`, `vc`, `dean`, `sports`, `library`, `curriculum`, `syllabus`, `internship`, `ranking`, `nirf`, `naac`, `accreditation`, `bml munjal university`, `kapashera`, `gurugram`, `gurgaon`, `sidhrawali`, `gateway`, `alumni`, `clubs`, `fest`, `culfest`, `hero group`, `school of engineering`, `school of management`, `school of law`
 
-#### Out of Scope Keywords:
-`recipe`, `cake`, `cook`, `cooking`, `fifa`, `cricket score`, `bitcoin`, `cryptocurrency`, `stock market`, `weather in`, `movie review`, `netflix`, `fortnite`, `minecraft`, `playstation`, `dating`, `horoscope`, `zodiac`
+#### Out of Scope Keywords & Phrases:
+- **Keywords:** `recipe`, `cake`, `cook`, `cooking`, `fifa`, `cricket`, `bitcoin`, `cryptocurrency`, `stock`, `weather`, `netflix`, `fortnite`, `minecraft`, `playstation`, `dating`, `horoscope`, `zodiac`
+- **Phrases:** `"president of"`, `"prime minister"`, `"capital of"`, `"weather in"`, `"weather of"`, `"cricket score"`, `"stock price"`, `"stock market"`, `"movie review"`, `"who is the pm"`, `"who is pm"`, `"lyrics of"`, `"song lyrics"`, `"cheat code"`
+
+When `enable_guardrails` is `False`, these out-of-scope or general knowledge inquiries bypass the scope block and dynamically route to `_generate_unconstrained_answer()`, providing raw direct LLM generation without refusal or unrelated university reference cards.
 
 ### 3.5 Input Guardrail Evaluation Logic
 
