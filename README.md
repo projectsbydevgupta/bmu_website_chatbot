@@ -748,6 +748,28 @@ Every answer is evaluated on a normalized **0.0 to 5.0 scale**:
 
 ---
 
+### 10.1 Responsive Mobile & Cross-Device UI Architecture
+
+The frontend interfaces (`/dashboard/` and `/dashboard/evaluation.html`) are engineered for high usability across all device form factors—from flagship desktop ultrawides to compact mobile smartphones (Apple iPhone, Samsung Galaxy, Google Pixel):
+
+1. **Native App-Like Mobile Layout (`100dvh` Viewport):**
+   - Implements dynamic viewport units (`100dvh`) with `position: fixed; inset: 0; overflow: hidden;` on mobile viewports ($\le 680\text{px}$). This prevents awkward page bouncing and virtual keyboard dislocation.
+   - Pinned compact topbar with truncated branding and space-optimized segmented controls, ensuring 80%+ of the screen remains dedicated to message reading.
+   - **Pinned Bottom Input Bar:** The chat input and send action button are permanently pinned to the bottom of the screen with `env(safe-area-inset-bottom)` support, preventing the text field from getting pushed off-screen.
+2. **Horizontal Swipeable Pill Carousel:**
+   - Quick-query suggestion chips (`Fee Structure`, `Hostel Facilities`, `Admissions 2025`, etc.) dynamically convert from wrapping cards to a smooth, inertia-scrolling horizontal ribbon (`overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;`).
+3. **Safe Markdown & Rich Typography Engine (`formatMarkdown`):**
+   - Chat response bubbles feature a lightweight, safe regex-based markdown parser that converts raw markdown asterisks and dashes into formatted typography:
+     - `**bold**` $\rightarrow$ `<strong>bold</strong>`
+     - `*italic*` $\rightarrow$ `<em>italic</em>`
+     - `- bullet item` $\rightarrow$ `&bull; bullet item`
+4. **URL & Citation Word-Breaking:**
+   - Citations and reference links enforce `word-break: break-all; overflow-wrap: anywhere;` to prevent long academic links from stretching or breaking container widths on small screens.
+5. **Responsive Benchmark Observatory (`evaluation.css`):**
+   - The Obsidian Telemetry Observatory automatically reflows from multi-column grid layouts into single-column responsive cards on screens $<768\text{px}$, with touch-scrolling data tables and edge-to-edge comparison modals.
+
+---
+
 ## 11. Complete Project File Map
 
 ```text

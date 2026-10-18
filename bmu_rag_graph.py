@@ -555,6 +555,7 @@ Context Excerpt:
 Evaluate carefully:
 - If the context answers the core question or significant parts of it, verdict is 'SUFFICIENT'.
 - If the context is missing key parts but other candidate pages exist, verdict is 'TRY_FALLBACK'.
+- Note: Distinguish specific leadership designations (e.g. 'chancellor' vs 'vice-chancellor'). If the user inquires about the Chancellor and the context only details the Vice-Chancellor without identifying the Chancellor, verdict is 'TRY_FALLBACK' to inspect other leadership candidate sources.
 - If the context is completely unrelated or proves the information does not exist, verdict is 'NOT_FOUND'.
 
 Respond strictly with valid JSON:

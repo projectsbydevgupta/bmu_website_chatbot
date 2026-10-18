@@ -737,3 +737,66 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .brand-group {
+    gap: 8px;
+  }
+
+  .brand-titles h1 {
+    font-size: 15px;
+  }
+
+  .brand-titles .subtitle {
+    display: none;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .status-indicator-group {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .status-pill {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .dashboard-container {
+    padding: 14px 12px 40px;
+    gap: 16px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .table-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .eval-table {
+    min-width: 600px;
+  }
+
+  .modal-card {
+    max-width: 95vw;
+    max-height: 90vh;
+    padding: 14px;
+    margin: 10px;
+  }
+}
+

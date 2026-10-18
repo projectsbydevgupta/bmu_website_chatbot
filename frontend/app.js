@@ -174,9 +174,24 @@ function addMessage(
     }
   }
 
+function formatMarkdown(raw) {
+  if (!raw) return "";
+  let text = String(raw)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  // Bold **text**
+  text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  // Italic *text*
+  text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  // Bullet lists (- item)
+  text = text.replace(/(?:^|\n)[ \t]*-[ \t]+(.+)/g, "<br>&bull; $1");
+  return text;
+}
+
   const textNode = document.createElement("div");
   textNode.className = "msg-text";
-  textNode.textContent = text;
+  textNode.innerHTML = formatMarkdown(text);
   node.appendChild(textNode);
 
   if (role === "bot" && Array.isArray(agentTrace) && agentTrace.length > 0) {
