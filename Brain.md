@@ -1890,4 +1890,11 @@ To prevent false-positive context audits where leadership titles conflict (e.g. 
 - BMU Vice-Chancellor: **Prof. Shyam Menon**
 - If a user asks "Who is the chancellor" and Candidate Context #1 contains only the Vice-Chancellor, Agent 2 is instructed **not** to treat Vice-Chancellor as sufficient for Chancellor, and must output `TRY_FALLBACK` to inspect candidate sources containing the Chancellor's profile.
 
+### 19.5 Adaptive Control Collapsing (.short-label / .long-label)
+To eliminate horizontal clipping on ultra-compact mobile viewports ($\le 390\text{px}$):
+- Controls declare dual label spans: `<span class="long-label">Cloud (Groq)</span><span class="short-label">Groq</span>`.
+- At $\le 680\text{px}$, CSS hides `.long-label` and `.brand-text`, exposing `.short-label` (`Groq`, `Local`, `Observatory`).
+- The red BMU mark (`34px`) acts as the anchor emblem, ensuring 100% of controls fit horizontally with zero overlap.
+
+
 

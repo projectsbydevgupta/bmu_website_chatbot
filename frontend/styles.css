@@ -138,6 +138,14 @@ body {
   background: rgba(255, 255, 255, 0.6);
 }
 
+.short-label {
+  display: none;
+}
+
+.long-label {
+  display: inline;
+}
+
 .seg-btn.active {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: #ffffff;
@@ -435,30 +443,23 @@ body {
     flex-shrink: 0;
   }
 
-  .brand-wrap {
-    gap: 0.5rem;
-    min-width: 0;
-    flex-shrink: 1;
+  .short-label {
+    display: inline;
   }
 
-  .brand-mark {
-    min-width: 34px;
-    width: 34px;
-    height: 34px;
-    font-size: 0.8rem;
-    border-radius: 8px;
-  }
-
-  .brand-title {
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .brand-subtitle {
+  .long-label {
     display: none;
   }
+
+  .brand-wrap {
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
+  .brand-text {
+    display: none;
+  }
+
 
   .control-cluster {
     gap: 0.4rem;

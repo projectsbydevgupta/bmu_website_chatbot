@@ -767,6 +767,8 @@ The frontend interfaces (`/dashboard/` and `/dashboard/evaluation.html`) are eng
    - Citations and reference links enforce `word-break: break-all; overflow-wrap: anywhere;` to prevent long academic links from stretching or breaking container widths on small screens.
 5. **Responsive Benchmark Observatory (`evaluation.css`):**
    - The Obsidian Telemetry Observatory automatically reflows from multi-column grid layouts into single-column responsive cards on screens $<768\text{px}$, with touch-scrolling data tables and edge-to-edge comparison modals.
+6. **Adaptive Control Collapsing (`.short-label` / `.long-label`):**
+   - Toggle buttons and navigation links automatically swap verbose labels for compact abbreviations on narrow screens (e.g., `Cloud (Groq)` $\rightarrow$ `Groq`, `Local LLM` $\rightarrow$ `Local`, `Benchmark Observatory` $\rightarrow$ `Observatory`), while retaining the bold BMU brand emblem and zero control overlap down to 360px screen widths.
 
 ---
 
