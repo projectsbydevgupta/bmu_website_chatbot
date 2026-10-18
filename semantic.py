@@ -350,10 +350,11 @@ def agents_status() -> dict[str, Any]:
             },
             {
                 "name": "Deterministic Tool: Hybrid Retrieval & Extractor",
-                "role": "SentenceTransformer dense embeddings & ChromaDB hybrid search",
+                "role": "Lightweight ONNX MiniLM dense embeddings & ChromaDB hybrid search (Zero PyTorch)",
                 "type": "Standalone FastAPI Retrieval Microservice",
                 "endpoint": os.getenv("RETRIEVAL_SERVICE_URL", "http://127.0.0.1:8001"),
             },
+
             {
                 "name": "Agent 2: Context Auditor",
                 "role": "Information sufficiency auditor & autonomous fallback decider",

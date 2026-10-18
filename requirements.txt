@@ -1,7 +1,8 @@
 chromadb
 pandas
-sentence-transformers
+onnxruntime
 scikit-learn
+
 numpy
 trafilatura
 requests

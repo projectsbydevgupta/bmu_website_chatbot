@@ -78,10 +78,10 @@ def get_chroma_and_embedder():
             )
             _chroma_collection = client.get_or_create_collection(name=COLLECTION_NAME)
         if _embedding_model is None:
-            from sentence_transformers import SentenceTransformer
-
-            _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+            from retrieval_service import get_embedder
+            _embedding_model = get_embedder()
         return _chroma_collection, _embedding_model
+
 
 
 # Local LLM Settings (Ollama / OpenAI-compatible endpoint)

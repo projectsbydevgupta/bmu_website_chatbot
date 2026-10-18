@@ -18,9 +18,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from sentence_transformers import SentenceTransformer
 
 from voyage_client import voyage_client
+
 
 # Load environment variables
 ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -106,10 +106,36 @@ def get_voyage_collection():
 
 
 def get_embedder():
+    """Returns a lightweight embedder object with an .encode(texts) interface.
+    Uses Chroma's built-in ONNXMiniLM_L6_V2 (ONNX Runtime, 0 MB PyTorch, ~90 MB RAM),
+    falling back to SentenceTransformer only if explicitly installed locally."""
     global _embedding_model
     if _embedding_model is None:
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        try:
+            import chromadb.utils.embedding_functions as ef
+            import numpy as np
+
+            class _OnnxEmbedderWrapper:
+                def __init__(self):
+                    self._fn = ef.ONNXMiniLM_L6_V2()
+
+                def encode(self, texts, **kwargs):
+                    if isinstance(texts, str):
+                        texts = [texts]
+                    res = self._fn(list(texts))
+                    return np.array(res)
+
+            _embedding_model = _OnnxEmbedderWrapper()
+            print("[Embedder] Initialized lightweight ONNX MiniLM embedder (Zero PyTorch overhead, ~90MB RAM).")
+        except Exception as exc:
+            print(f"[Embedder] Notice: ONNX loader exception ({exc}). Attempting SentenceTransformer fallback.")
+            try:
+                from sentence_transformers import SentenceTransformer
+                _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+            except Exception as st_exc:
+                raise RuntimeError(f"Could not initialize embedding engine: {st_exc}") from st_exc
     return _embedding_model
+
 
 
 def get_chroma_and_embedder():
