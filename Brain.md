@@ -1712,6 +1712,18 @@ Orchestrates local developer bootup and shutdown in Windows environments:
 
 > **Note:** Step numbering in the batch file is inconsistent: `[1/3]`, `[2/4]`, `[3/4]`.
 
+### 14.2 Cloud Production Entrypoint (`start.sh` - Render Container)
+For cloud Linux containers (Render Free Tier with 512MB RAM cap), `start.sh` manages single-container execution:
+1. **Thread & Memory Limits:**
+   - `export OMP_NUM_THREADS=1` and `export MKL_NUM_THREADS=1` prevent CPU thrashing.
+   - `export TOKENIZERS_PARALLELISM=false` prevents thread deadlock during tokenization.
+   - `export RETRIEVAL_SERVICE_URL=""` enables direct in-process retrieval, bypassing unnecessary loopback HTTP hops.
+   - `export ENABLE_LIVE_SCRAPING=false` eliminates network-blocking web scrapes during query latency windows.
+2. **Embedder Pre-Warming:**
+   - Executes `python -c "from retrieval_service import get_embedder; get_embedder().encode('bmu query')"` to pre-warm the ONNX MiniLM model and tokenizers during boot, eliminating cold-start latency for the first user query.
+3. **Gateway Launch:**
+   - Boots `python -u semantic.py`, binding Uvicorn directly to Render's dynamic `${PORT:-8000}`.
+
 ---
 
 ## 15. Known Issues & Technical Debt
