@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <title>BMU Evaluation Observatory | 100-Question Benchmark</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="./evaluation.css?v=1.1" />
+    <link rel="stylesheet" href="./evaluation.css?v=2.5" />
   </head>
   <body>
     <div class="observatory-grid-bg"></div>
@@ -38,12 +38,14 @@
           </div>
         </div>
 
-        <button id="exportCsvBtn" class="btn btn-secondary" title="Export all 100 question evaluations as CSV">
-          <span class="btn-icon">📥</span> Export CSV
-        </button>
-        <button id="exportJsonBtn" class="btn btn-secondary" title="Export full evaluation payload as JSON">
-          <span class="btn-icon">📥</span> Export JSON
-        </button>
+        <div class="export-btn-group">
+          <button id="exportCsvBtn" class="btn btn-secondary" title="Export all 100 question evaluations as CSV">
+            <span class="btn-icon">📥</span> Export CSV
+          </button>
+          <button id="exportJsonBtn" class="btn btn-secondary" title="Export full evaluation payload as JSON">
+            <span class="btn-icon">📥</span> Export JSON
+          </button>
+        </div>
       </div>
     </header>
 
@@ -180,6 +182,7 @@
           <h2>Category Breakdown (20 Specialized Domains)</h2>
           <span class="section-badge">100 Benchmark Cases</span>
         </div>
+        <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full metrics</span></div>
         <div class="table-wrap">
           <table class="data-table" id="categoryTable">
             <thead>
@@ -227,6 +230,7 @@
           </div>
         </div>
 
+        <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full question matrix</span></div>
         <div class="table-wrap">
           <table class="data-table drilldown-table" id="questionsTable">
             <thead>
