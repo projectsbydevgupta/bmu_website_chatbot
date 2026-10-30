@@ -36,6 +36,11 @@ def init_phoenix_tracing(
     ep = endpoint or os.getenv("PHOENIX_COLLECTOR_ENDPOINT") or os.getenv("PHOENIX_ENDPOINT", "http://localhost:6006")
     api_key = os.getenv("PHOENIX_API_KEY")
 
+    # Sanitize OTEL_EXPORTER_OTLP_HEADERS if token was pasted without 'Authorization=Bearer ' prefix
+    raw_otel = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "").strip().strip("'\"")
+    if raw_otel and not raw_otel.startswith("Authorization="):
+        os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Bearer {raw_otel}"
+
     # If using local Phoenix server, probe localhost before registering to avoid network timeouts
     is_cloud_phoenix = bool(api_key or "arize.com" in ep)
     if not is_cloud_phoenix:
