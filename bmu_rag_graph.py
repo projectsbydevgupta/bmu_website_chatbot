@@ -244,8 +244,17 @@ def _keyword_score(query: str, text: str, url: str = "", title: str = "") -> flo
     url_low = (url or "").lower()
     if "/social/" in url_low or "/blogs/" in url_low:
         base_score *= 0.65
-    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/", "/academics/", "/faculty-recruitments/", "/campus-life/sports/"]):
+    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/", "/academics/", "/faculty-recruitments/", "/campus-life/sports/", "/academics/faculty/"]):
         base_score = min(1.0, base_score * 1.30)
+
+    # Information Retrieval Hierarchy: If URL is an individual person leaf profile (/faculty/<slug>),
+    # only prioritize it if the query actually contains terms matching the individual's name.
+    # For broad queries ("faculty details"), preserve hub pages (/academics/faculty/) at the top.
+    if "/faculty/" in url_low and any(prefix in url_low for prefix in ["/dr-", "-phd", "/prof-", "/mr-", "/ms-"]):
+        slug = url_low.split("/faculty/")[-1].strip("/")
+        name_parts = set(re.findall(r"[a-z]{3,}", slug)) - {"phd", "prof", "mr", "ms", "faculty"}
+        if name_parts and not q_tokens.intersection(name_parts):
+            base_score *= 0.85
 
     return round(base_score, 4)
 
@@ -759,10 +768,13 @@ def response_synthesizer_node(state: BMURAGState) -> Dict[str, Any]:
 Answer the student's question clearly, accurately, and concisely based STRICTLY on the provided vetted context.
 Guidelines:
 1. State facts directly. If fees, dates, or eligibility criteria are mentioned, format them with clean bullet points.
-2. If the user asks an overview question (e.g. regarding faculty details, courses offered, academic schools, or campus facilities), synthesize a comprehensive, well-structured response (grouping by School, Category, or visiting/permanent faculty) reflecting all verified facts present across the vetted context.
-3. Do not assume, speculate, or extrapolate facts not present in the context.
-4. If the context does not explicitly mention a detail, state clearly that it is not specified in the current records.
-5. Do not use markdown headers (# or ##), keep paragraphs tidy, polite, and well-structured using bold titles and clean bullet points.
+2. Institutional Overview Focus:
+   - For broad inquiries (e.g. faculty details, courses offered, admissions process, campus facilities), synthesize a structured institutional overview:
+     * Faculty inquiries: Explain how faculty are organized across schools (School of Engineering & Technology, School of Management, School of Law, School of Liberal Studies), the faculty categories (Core Full-time Faculty, Deans/Academic Leadership, Distinguished Visiting Faculty, and Industry Guest Faculty), academic credentials (Ph.D./research focus), and student mentorship.
+     * Course inquiries: Group clearly by Academic Level (Undergraduate, Postgraduate, Doctoral & Professional) and specify the Schools and major degree specialisations.
+   - Hierarchy Rule: Never dump an exhaustive multi-bullet personal CV of a single individual professor (e.g. their previous colleges or degree years) unless the user explicitly inquired about that specific person by name. If individual faculty names appear in the context, list them concisely as leadership or representative examples under their respective schools.
+3. Grounding & Zero-Hallucination: Do not assume, speculate, or extrapolate facts not present in the context. If the context does not explicitly mention a detail, state clearly that it is not specified in current records.
+4. Formatting: Do not use markdown headers (# or ##). Keep paragraphs tidy, polite, and well-structured using bold titles and clean bullet points.
 
 Context:
 {vetted_context}

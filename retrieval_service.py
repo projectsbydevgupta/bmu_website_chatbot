@@ -268,8 +268,17 @@ def _keyword_score(query: str, text: str, url: str = "", title: str = "") -> flo
     url_low = (url or "").lower()
     if "/social/" in url_low or "/blogs/" in url_low:
         base_score *= 0.65
-    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/", "/academics/", "/faculty-recruitments/", "/campus-life/sports/"]):
+    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/", "/academics/", "/faculty-recruitments/", "/campus-life/sports/", "/academics/faculty/"]):
         base_score = min(1.0, base_score * 1.30)
+
+    # Information Retrieval Hierarchy: If URL is an individual person leaf profile (/faculty/<slug>),
+    # only prioritize it if the query actually contains terms matching the individual's name.
+    # For broad queries ("faculty details"), preserve hub pages (/academics/faculty/) at the top.
+    if "/faculty/" in url_low and any(prefix in url_low for prefix in ["/dr-", "-phd", "/prof-", "/mr-", "/ms-"]):
+        slug = url_low.split("/faculty/")[-1].strip("/")
+        name_parts = set(re.findall(r"[a-z]{3,}", slug)) - {"phd", "prof", "mr", "ms", "faculty"}
+        if name_parts and not q_tokens.intersection(name_parts):
+            base_score *= 0.85
 
     return round(base_score, 4)
 
