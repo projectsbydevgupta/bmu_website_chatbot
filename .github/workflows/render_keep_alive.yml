@@ -1,0 +1,26 @@
+name: Render Keep-Alive Cron Job
+
+# Automatically pings the Render deployment every 10 minutes to prevent the free tier from sleeping (cold starts).
+on:
+  schedule:
+    # Runs every 10 minutes (Render sleeps after 15 minutes of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  keep_alive:
+    name: Ping Render Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Keep-Alive HTTP Ping
+        env:
+          RENDER_URL: ${{ secrets.RENDER_BACKEND_URL || 'https://bmu-website-chatbot.onrender.com' }}
+        run: |
+          echo "Sending keep-alive ping to: $RENDER_URL/health"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$RENDER_URL/health" || echo "failed")
+          echo "Render Health Check HTTP Status: $RESPONSE"
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Render instance is active, warm, and responsive."
+          else
+            echo "⚠️ Health ping responded with status: $RESPONSE (Service may be waking up or URL needs configuration)"
+          fi

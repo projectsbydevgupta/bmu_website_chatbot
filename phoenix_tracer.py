@@ -34,27 +34,35 @@ def init_phoenix_tracing(
     # Check config
     proj = project_name or os.getenv("PHOENIX_PROJECT") or os.getenv("PHOENIX_PROJECT_NAME", "bmu-website-chatbot")
     ep = endpoint or os.getenv("PHOENIX_COLLECTOR_ENDPOINT") or os.getenv("PHOENIX_ENDPOINT", "http://localhost:6006")
-    # Quick probe: only register if Phoenix server is running to prevent export retry delays
-    try:
-        import urllib.request
-        base_ep = ep.replace("/v1/traces", "")
-        with urllib.request.urlopen(base_ep, timeout=0.4):
-            pass
-    except Exception:
-        logger.info("[Phoenix Tracing] Phoenix server is offline. Skipping trace export.")
-        return False
+    api_key = os.getenv("PHOENIX_API_KEY")
+
+    # If using local Phoenix server, probe localhost before registering to avoid network timeouts
+    is_cloud_phoenix = bool(api_key or "arize.com" in ep)
+    if not is_cloud_phoenix:
+        try:
+            import urllib.request
+            base_ep = ep.replace("/v1/traces", "")
+            with urllib.request.urlopen(base_ep, timeout=0.4):
+                pass
+        except Exception:
+            logger.info("[Phoenix Tracing] Local Phoenix server is offline. Skipping trace export.")
+            return False
 
     try:
         from phoenix.otel import register
         from opentelemetry import trace
 
         # Register phoenix OpenTelemetry provider with auto instrumentation for Groq/LangChain
-        register(
-            project_name=proj,
-            endpoint=ep,
-            auto_instrument=True,
-            set_global_tracer_provider=True,
-        )
+        register_kwargs = {
+            "project_name": proj,
+            "endpoint": ep,
+            "auto_instrument": True,
+            "set_global_tracer_provider": True,
+        }
+        if api_key:
+            register_kwargs["api_key"] = api_key
+
+        register(**register_kwargs)
         _tracer = trace.get_tracer("bmu_rag_chatbot")
         _is_initialized = True
         logger.info(f"[Phoenix Tracing] Connected to {ep} (Project: {proj})")
