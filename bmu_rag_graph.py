@@ -451,7 +451,10 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
 
     # If top score is above threshold, construct candidate sources instantly from high-quality Chroma summaries
     if ranked and ranked[0]["score"] >= 0.10:
-        enable_scraping = os.getenv("ENABLE_LIVE_SCRAPING", "false").lower() == "true"
+        enable_scraping = os.getenv("ENABLE_LIVE_SCRAPING", "true").lower() == "true"
+        browser_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
         single_candidates: List[CandidateContext] = []
         for i, item in enumerate(ranked[:3]):
             url = item["url"]
@@ -459,14 +462,14 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
             top_results.append({"url": url, "score": score})
 
             content_text = item["summary"]
-            # Optional live scraping: only if explicitly enabled (cloud defaults to instant cached summaries)
+            # Live page extraction: fetches current BMU webpage with browser headers, gracefully retaining verified ChromaDB summary on network timeout
             if enable_scraping and url:
                 try:
-                    resp_web = requests.get(url, timeout=1.5)
+                    resp_web = requests.get(url, headers=browser_headers, timeout=2.0)
                     if resp_web.status_code == 200 and resp_web.text:
                         extracted = trafilatura.extract(resp_web.text)
                         if extracted and len(extracted.strip()) > 100:
-                            content_text = extracted[:3500]
+                            content_text = extracted[:4000]
                 except Exception:
                     pass
 
@@ -478,11 +481,13 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
                 "type": "scraped_page" if content_text != item["summary"] else "stored_summary",
             })
 
-        # Synthesized multi-document Chroma summaries (top 6 documents)
-        summary_bundle = "\n\n---\n\n".join(
-            f"Source [{r.get('url', 'BMU Portal')}]:\n{r.get('summary', '')}"
-            for r in ranked[:6] if r.get("summary")
-        )
+        # Synthesized multi-document bundle incorporating both live scraped page text and verified ChromaDB summaries
+        summary_bundle_parts = []
+        for r in ranked[:6]:
+            u = r.get("url", "")
+            live_text = next((c["content"] for c in single_candidates if c["url"] == u), r.get("summary", ""))
+            summary_bundle_parts.append(f"Source [{u or 'BMU Portal'}]:\n{live_text}")
+        summary_bundle = "\n\n---\n\n".join(summary_bundle_parts)
         bundle_candidate: Optional[CandidateContext] = None
         if summary_bundle:
             bundle_candidate = {
