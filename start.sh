@@ -8,7 +8,7 @@ export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export TOKENIZERS_PARALLELISM=false
 export RETRIEVAL_SERVICE_URL=""
-export ENABLE_LIVE_SCRAPING=false
+export ENABLE_LIVE_SCRAPING="${ENABLE_LIVE_SCRAPING:-true}"
 export RETRIEVAL_ENGINE="${RETRIEVAL_ENGINE:-voyage}"
 
 # Pre-warm lightweight ONNX MiniLM embedder cache during boot (< 90MB RAM, Zero PyTorch)
