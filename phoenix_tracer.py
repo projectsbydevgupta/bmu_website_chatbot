@@ -49,6 +49,14 @@ def init_phoenix_tracing(
             return False
 
     try:
+        # Compatibility patch for OpenTelemetry HTTPSpanExporter in newer versions
+        try:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            if not hasattr(OTLPSpanExporter, "_headers"):
+                OTLPSpanExporter._headers = property(lambda self: getattr(self, "headers", {}))
+        except Exception:
+            pass
+
         from phoenix.otel import register
         from opentelemetry import trace
 
@@ -60,7 +68,7 @@ def init_phoenix_tracing(
             "set_global_tracer_provider": True,
         }
         if api_key:
-            register_kwargs["api_key"] = api_key
+            register_kwargs["headers"] = {"Authorization": f"Bearer {api_key}"}
 
         register(**register_kwargs)
         _tracer = trace.get_tracer("bmu_rag_chatbot")
