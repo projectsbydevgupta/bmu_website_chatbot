@@ -831,8 +831,27 @@ $$\mathbf{FinalScore} = \mathbf{0.68} \times \text{SemanticSimilarity} + \mathbf
 | Dimensions | 384 | 1024 |
 | Speed | ~15ms inference on CPU | Remote API via MongoDB Atlas |
 | Memory | Zero PyTorch (~90MB RAM) | Zero Local Model (~0MB RAM) |
-| Default? | Yes (env `RETRIEVAL_ENGINE=minilm`) | Set via env or per-request |
+| Default? | Fallback (env `RETRIEVAL_ENGINE=minilm`) | Active Production (env `RETRIEVAL_ENGINE=voyage`) |
 
+### 5.2.1 Dual-Collection Production Topology (1,258 Summaries in Both Collections)
+
+Both collections in ChromaDB Cloud now house the complete, verified 1,258 BMU document corpus:
+* **`bmu_voyage_knowledge` (1,258 documents, 1,024-dim):** The active primary production collection. Powered by Voyage AI (`voyage-4-large`) remote API, consuming **0 MB local RAM** on Render.
+* **`bmu_summaries` (1,258 documents, 384-dim):** The offline/local fallback collection. Powered by ONNX MiniLM, consuming ~90 MB RAM.
+
+1. **`bmu_summaries` (1,258 Documents — Fixed Production Corpus):**
+   - **Does NOT automatically increase at runtime.**
+   - Marked strictly as **`READ-ONLY`** by `semantic.py` and `retrieval_service.py` during query serving.
+   - **Rationale:** University academic regulations, cutoffs, and fee schedules require 100% verified ground truth. If arbitrary live web scrapes automatically mutated the production database, transient formatting errors or marketing revisions on the live website could silently corrupt student responses. It remains pinned to the 1,258 documents produced by the Hybrid v5 summarizer until an administrator explicitly runs a vetted re-indexing batch (`vector.py`).
+
+2. **`bmu_voyage_knowledge` (Dynamic Crawler Knowledge Base):**
+   - **DOES grow incrementally** as new web pages are crawled by `ingestion_service.py` (Port 8002).
+   - When new BMU pages are discovered via `POST /ingest/crawl` or `POST /ingest/url`, the service partitions them into 800-character semantic chunks (with 150-char overlap), maps them into 1,024-dimensional vectors via Voyage AI, and writes them into `bmu_voyage_knowledge`.
+   - **SHA-256 Hash Deduplication:** To prevent redundant embeddings and preserve Voyage AI rate limits, each chunk's normalized text is hashed with SHA-256 (`f"voyage_{url_hash}_{idx:03d}"`). Existing chunk IDs in ChromaDB are skipped.
+   - **On-Demand Triggering:** Crawling is triggered **on-demand** by administrative endpoints or scheduled jobs, rather than an unmonitored infinite loop, protecting against API credit exhaustion and storage bloat.
+
+3. **Empirical Benchmarking via `/retrieve/compare`:**
+   - In `retrieval_service.py`, `POST /retrieve/compare` executes the user's query concurrently against both collections, returning side-by-side latency, similarity scores, and candidate documents to evaluate whether 1024-dim Voyage embeddings justify migration from the 384-dim MiniLM baseline.
 
 **Over-fetch Logic:**
 ```python
@@ -1932,6 +1951,35 @@ To prevent false-positive context audits where leadership titles conflict (e.g. 
 - BMU Chancellor: **Sunil Kant Munjal**
 - BMU Vice-Chancellor: **Prof. Shyam Menon**
 - If a user asks "Who is the chancellor" and Candidate Context #1 contains only the Vice-Chancellor, Agent 2 is instructed **not** to treat Vice-Chancellor as sufficient for Chancellor, and must output `TRY_FALLBACK` to inspect candidate sources containing the Chancellor's profile.
+
+---
+
+## 20. Voyage AI (1,024-Dim) Cloud Migration & Multi-Document Overview Synthesis Architecture
+
+### 20.1 Dual ChromaDB Cloud Collection Architecture
+To achieve high retrieval accuracy without exceeding cloud constraints, the system maintains two parallel ChromaDB Cloud collections:
+1. `bmu_voyage_knowledge`: 1,258 verified BMU webpage records embedded with Voyage AI (`voyage-4-large`, 1,024 dimensions). This serves as the primary active retrieval engine (`RETRIEVAL_ENGINE=voyage`).
+2. `bmu_summaries`: 1,258 records embedded with `all-MiniLM-L6-v2` (384 dimensions). Retained as an offline fallback engine (`RETRIEVAL_ENGINE=minilm`).
+
+### 20.2 Cosine Similarity from Squared L2 Distance Formula
+ChromaDB collections created with default distance use squared Euclidean distance ($\|u - v\|^2$). For unit-normalized embedding vectors (such as Voyage AI and MiniLM), the exact cosine similarity formula is:
+$$\cos(u, v) = 1.0 - \frac{\|u - v\|^2}{2.0} = 1.0 - \frac{dist}{2.0}$$
+Previous implementations used $\max(0.0, 1.0 - dist)$, which crushed semantic similarities to 0 whenever $dist > 1.0$ (cosine similarity $< 0.5$). Correcting this formula restored full semantic recall across academic domains.
+
+### 20.3 Agent 1 Acronym Isolation & Broad Query Scope Preservation
+To prevent prompt contamination where few-shot examples were mistakenly injected into unrelated queries:
+- Acronym expansions are strictly conditioned: Agent 1 only expands acronyms that explicitly appear in the user prompt (e.g., expanding "CSE" to "Computer Science and Engineering (CSE)" only if the user wrote "CSE").
+- Broad queries (such as "Faculty details", "Courses offered", "Fee structure", "Sports facilities") are preserved as university-wide overview queries without narrowing to specific engineering departments.
+
+### 20.4 Multi-Document Overview Bundle Prioritization
+For broad/overview inquiries (queries $\le 3$ keywords or containing overview terms):
+- Candidate 1 is dynamically assigned to the **Multi-Document Synthesis Bundle** (aggregating the top 6 ChromaDB records across schools, degrees, and facilities).
+- Candidate 2 and 3 provide individual URL deep-dives.
+- Agent 2 (Context Auditor) evaluates the multi-document bundle as a comprehensive knowledge source, preventing premature acceptance of a single professor's bio or a single elective for a university-wide inquiry.
+
+### 20.5 Reasoning Model Token Budgeting (`max_tokens=2048`)
+The primary synthesis model on Groq Cloud (`openai/gpt-oss-120b`) is an advanced reasoning model that produces internal thought chains (`reasoning`). To prevent token starvation where reasoning consumed the entirety of an 800-token budget, the synthesis token limit was elevated to `max_tokens=2048`, guaranteeing full, rich responses with clean categorization by school and department.
+
 
 
 

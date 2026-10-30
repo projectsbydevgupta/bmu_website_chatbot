@@ -198,12 +198,16 @@ def _stem_token(word: str) -> str:
     w = word.lower().strip()
     if w in ("fees", "tuition"):
         return "fee"
-    if w in ("hostels",):
+    if w in ("hostels", "hostel", "accommodation", "residence", "dorm", "dorms"):
         return "hostel"
-    if w in ("admissions",):
+    if w in ("admissions", "admission", "admit"):
         return "admission"
-    if w in ("courses", "programmes", "programs"):
+    if w in ("courses", "programmes", "programs", "programme", "program", "course", "degrees", "degree"):
         return "course"
+    if w in ("faculty", "faculties", "professors", "professor", "lecturers", "lecturer", "teachers", "teacher", "deans", "dean"):
+        return "faculty"
+    if w in ("sports", "sport", "athletics", "games", "gymnasium", "gym"):
+        return "sport"
     if w in ("placements",):
         return "placement"
     if w in ("scholarships",):
@@ -236,12 +240,12 @@ def _keyword_score(query: str, text: str, url: str = "", title: str = "") -> flo
     overlap = q_tokens.intersection(d_tokens)
     base_score = len(overlap) / len(q_tokens)
 
-    # Authority adjustments: prioritize official portal/course/fee pages over marketing blog posts
+    # Authority adjustments: prioritize official portal/course/fee/faculty pages over marketing blog posts
     url_low = (url or "").lower()
     if "/social/" in url_low or "/blogs/" in url_low:
         base_score *= 0.65
-    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/"]):
-        base_score = min(1.0, base_score * 1.25)
+    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/", "/academics/", "/faculty-recruitments/", "/campus-life/sports/"]):
+        base_score = min(1.0, base_score * 1.30)
 
     return round(base_score, 4)
 
@@ -281,11 +285,17 @@ def query_specialist_node(state: BMURAGState) -> Dict[str, Any]:
     client, model_name = get_llm_client("query", provider=provider)
 
     prompt = f"""You are the BMU Academic Query Specialist.
-Analyze the user's inquiry regarding BML Munjal University (BMU) and transform it into an optimal search representation.
+Analyze the user's inquiry regarding BML Munjal University (BMU) and transform it into an optimal search representation for vector knowledge retrieval.
 
-Tasks:
-1. Retain core degree acronyms while including expansions (e.g. 'B.Tech Computer Science and Engineering CSE', 'BMU BML Munjal University', 'fees tuition fee structure').
-2. Produce an 'optimized_query' rich in official BMU terminology for vector search without generic filler.
+Core Rules:
+1. Acronym Expansion Rule: ONLY expand degree or university acronyms that EXPLICITLY appear in the user's inquiry.
+   - If user says "CSE", expand to "Computer Science and Engineering (CSE)".
+   - If user says "MBA", expand to "Master of Business Administration (MBA)".
+   - If user says "BMU", include "BML Munjal University".
+   - NEVER invent or inject degrees or engineering departments (e.g. do NOT inject B.Tech or CSE) if the user did not ask for them.
+2. Scope Preservation:
+   - For broad queries (e.g. "Faculty details", "Courses offered", "Fee structure", "Admissions process", "Hostel facilities", "Sports"), maintain a university-wide overview representation (e.g. "BML Munjal University academic programmes degrees offered" or "BML Munjal University faculty members teaching staff overview"). Do NOT narrow down to a single professor, single department, or single elective.
+   - For specific queries (e.g. "Dr. Deepti Sharma" or "B.Tech CSE fees"), preserve the specific entity or subject.
 3. Extract 3-5 core 'keywords'.
 4. Classify 'intent' into one of: 'admissions', 'courses', 'fees', 'hostels', 'placements', 'faculty', 'campus', 'general'.
 
@@ -422,7 +432,8 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
             distances = results.get("distances", [[]])[0]
 
             for doc, meta, dist in zip(documents, metadatas, distances):
-                sem_sim = max(0.0, 1.0 - dist)
+                # Correct cosine similarity from squared L2 distance: 1.0 - (dist / 2.0)
+                sem_sim = max(0.0, 1.0 - (dist / 2.0))
                 kw_sc = _keyword_score(opt_query, doc, url=meta.get("url", ""), title=meta.get("title", ""))
                 final_sc = (0.68 * sem_sim) + (0.32 * kw_sc)
                 ranked.append({
@@ -441,7 +452,8 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
     # If top score is above threshold, construct candidate sources instantly from high-quality Chroma summaries
     if ranked and ranked[0]["score"] >= 0.10:
         enable_scraping = os.getenv("ENABLE_LIVE_SCRAPING", "false").lower() == "true"
-        for i, item in enumerate(ranked[:2]):
+        single_candidates: List[CandidateContext] = []
+        for i, item in enumerate(ranked[:3]):
             url = item["url"]
             score = item["score"]
             top_results.append({"url": url, "score": score})
@@ -458,7 +470,7 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
                 except Exception:
                     pass
 
-            candidates.append({
+            single_candidates.append({
                 "source": url or f"Chroma Document #{i+1}",
                 "url": url,
                 "content": content_text,
@@ -466,19 +478,38 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
                 "type": "scraped_page" if content_text != item["summary"] else "stored_summary",
             })
 
-        # Add Candidate 3: Synthesized multi-document Chroma summaries (top 6 documents)
+        # Synthesized multi-document Chroma summaries (top 6 documents)
         summary_bundle = "\n\n---\n\n".join(
             f"Source [{r.get('url', 'BMU Portal')}]:\n{r.get('summary', '')}"
             for r in ranked[:6] if r.get("summary")
         )
+        bundle_candidate: Optional[CandidateContext] = None
         if summary_bundle:
-            candidates.append({
-                "source": "BMU Curated Knowledge Base (ChromaDB Summaries)",
+            bundle_candidate = {
+                "source": "BMU Curated Knowledge Base (Multi-Document Synthesis)",
                 "url": ranked[0].get("url", "https://www.bmu.edu.in"),
                 "content": summary_bundle,
                 "score": ranked[0]["score"],
                 "type": "stored_summary",
-            })
+            }
+
+        # Query Breadth Detection:
+        # If the user query is broad / overview-oriented, place the comprehensive multi-document bundle FIRST
+        # so synthesis receives the full institutional picture (multiple schools, visiting faculty, degree ranges).
+        raw_q_lower = state.get("raw_query", "").lower()
+        q_tokens = [w for w in re.findall(r"\w+", raw_q_lower) if w not in STOPWORDS]
+        is_broad = (
+            len(q_tokens) <= 3
+            or any(w in raw_q_lower for w in ["faculty details", "courses offered", "programmes", "programs offered", "what are the courses", "what are the facilities", "sports facilities", "admissions process", "admission process", "fee structure", "fees structure"])
+        )
+
+        if is_broad and bundle_candidate:
+            candidates.append(bundle_candidate)
+            candidates.extend(single_candidates[:2])
+        else:
+            candidates.extend(single_candidates[:2])
+            if bundle_candidate:
+                candidates.append(bundle_candidate)
     else:
         # Low similarity score
         for item in ranked[:3]:
@@ -550,12 +581,14 @@ Student Question: "{raw_query}"
 Candidate Source: {source_name} (Candidate {idx+1} of {len(candidates)})
 
 Context Excerpt:
-{content[:2500]}
+{content[:6000]}
 
 Evaluate carefully:
 - If the context answers the core question or significant parts of it, verdict is 'SUFFICIENT'.
+- Multi-Document Synthesis Bundle Rule: If evaluating Candidate Source 'BMU Curated Knowledge Base (Multi-Document Synthesis)', it aggregates multiple official BMU records. If the student asked an overview query (e.g. 'faculty details', 'courses offered', 'admissions process', 'sports facilities') and this bundle contains information across multiple BMU schools, faculty members, or programs, verdict MUST be 'SUFFICIENT'.
 - If the context is missing key parts but other candidate pages exist, verdict is 'TRY_FALLBACK'.
 - Note: Distinguish specific leadership designations (e.g. 'chancellor' vs 'vice-chancellor'). If the user inquires about the Chancellor and the context only details the Vice-Chancellor without identifying the Chancellor, verdict is 'TRY_FALLBACK' to inspect other leadership candidate sources.
+- Broad vs Narrow Scope Check: For single-page candidates, if the student asks for general, university-wide information (e.g. 'faculty details', 'courses offered', 'fee structure') and the candidate context covers ONLY a single specific individual (e.g. one professor's bio) or one single narrow elective, verdict is 'TRY_FALLBACK' to inspect broader candidate sources or the multi-document synthesis bundle.
 - If the context is completely unrelated or proves the information does not exist, verdict is 'NOT_FOUND'.
 
 Respond strictly with valid JSON:
@@ -598,7 +631,13 @@ Respond strictly with valid JSON:
     if not decision:
         q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3 and w.lower() not in STOPWORDS]
         matches = [w for w in q_words if w in content.lower()]
-        if len(matches) >= 2 and len(content) > 300 and cand_score >= 0.18:
+        cand_url = candidate.get("url", "").lower()
+        is_single_profile = ("/faculty/" in cand_url and not cand_url.endswith("/faculty/"))
+        is_broad = any(w in raw_query.lower() for w in ["faculty details", "courses offered", "programmes", "programs"])
+        if is_broad and is_single_profile and not is_last_candidate:
+            decision = "TRY_FALLBACK"
+            reason = "Auditor fallback: general query detected; inspecting broader candidate context."
+        elif len(matches) >= 2 and len(content) > 300 and cand_score >= 0.18:
             decision = "SUFFICIENT"
             reason = f"Heuristic acceptance: verified factual match on {', '.join(matches[:3])}."
         elif is_last_candidate:
@@ -608,14 +647,14 @@ Respond strictly with valid JSON:
             decision = "TRY_FALLBACK"
             reason = "Heuristic fallback: checking next candidate source."
 
-    # If it is the last candidate (e.g. combined bundle), accept if relevant keywords match
-    if is_last_candidate:
+    # For the multi-document bundle or last candidate, accept if relevant keywords match
+    if "Multi-Document Synthesis" in source_name or is_last_candidate:
         q_words = [w.lower() for w in re.findall(r"\w+", raw_query) if len(w) > 3 and w.lower() not in STOPWORDS]
         matches = [w for w in q_words if w in content.lower()]
         if len(matches) >= 2 and len(content) > 200 and cand_score >= 0.18:
             decision = "SUFFICIENT"
             reason = f"Conclusive acceptance on knowledge base bundle ({', '.join(matches[:3])})."
-        elif decision == "TRY_FALLBACK":
+        elif is_last_candidate and decision == "TRY_FALLBACK":
             decision = "NOT_FOUND"
             reason += " (Exhausted all candidate sources)."
 
@@ -715,9 +754,10 @@ def response_synthesizer_node(state: BMURAGState) -> Dict[str, Any]:
 Answer the student's question clearly, accurately, and concisely based STRICTLY on the provided vetted context.
 Guidelines:
 1. State facts directly. If fees, dates, or eligibility criteria are mentioned, format them with clean bullet points.
-2. Do not assume, speculate, or extrapolate facts not present in the context.
-3. If the context does not explicitly mention a detail, state clearly that it is not specified in the current records.
-4. Do not use markdown headers (# or ##), keep paragraphs tidy and friendly.
+2. If the user asks an overview question (e.g. regarding faculty details, courses offered, academic schools, or campus facilities), synthesize a comprehensive, well-structured response (grouping by School, Category, or visiting/permanent faculty) reflecting all verified facts present across the vetted context.
+3. Do not assume, speculate, or extrapolate facts not present in the context.
+4. If the context does not explicitly mention a detail, state clearly that it is not specified in the current records.
+5. Do not use markdown headers (# or ##), keep paragraphs tidy, polite, and well-structured using bold titles and clean bullet points.
 
 Context:
 {vetted_context}
@@ -737,7 +777,7 @@ Question:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.2,
-            max_tokens=800,
+            max_tokens=2048,
         )
         answer = response.choices[0].message.content or "Not found in context"
     except Exception as exc:
@@ -755,7 +795,7 @@ Question:
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.2,
-                    max_tokens=800,
+                    max_tokens=2048,
                 )
                 answer = fb_resp.choices[0].message.content or "Not found in context"
                 provider = "groq (fallback)"

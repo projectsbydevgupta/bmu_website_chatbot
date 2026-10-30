@@ -222,12 +222,16 @@ def _stem_token(word: str) -> str:
     w = word.lower().strip()
     if w in ("fees", "tuition"):
         return "fee"
-    if w in ("hostels",):
+    if w in ("hostels", "hostel", "accommodation", "residence", "dorm", "dorms"):
         return "hostel"
-    if w in ("admissions",):
+    if w in ("admissions", "admission", "admit"):
         return "admission"
-    if w in ("courses", "programmes", "programs"):
+    if w in ("courses", "programmes", "programs", "programme", "program", "course", "degrees", "degree"):
         return "course"
+    if w in ("faculty", "faculties", "professors", "professor", "lecturers", "lecturer", "teachers", "teacher", "deans", "dean"):
+        return "faculty"
+    if w in ("sports", "sport", "athletics", "games", "gymnasium", "gym"):
+        return "sport"
     if w in ("placements",):
         return "placement"
     if w in ("scholarships",):
@@ -260,12 +264,12 @@ def _keyword_score(query: str, text: str, url: str = "", title: str = "") -> flo
     overlap = q_tokens.intersection(d_tokens)
     base_score = len(overlap) / len(q_tokens)
 
-    # Authority adjustments: prioritize official portal/course/fee pages over marketing blog posts
+    # Authority adjustments: prioritize official portal/course/fee/faculty pages over marketing blog posts
     url_low = (url or "").lower()
     if "/social/" in url_low or "/blogs/" in url_low:
         base_score *= 0.65
-    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/"]):
-        base_score = min(1.0, base_score * 1.25)
+    elif any(p in url_low for p in ["/courses/", "/fee-structure/", "/admission/", "/programmes/", "/academics/", "/faculty-recruitments/", "/campus-life/sports/"]):
+        base_score = min(1.0, base_score * 1.30)
 
     return round(base_score, 4)
 
@@ -349,7 +353,9 @@ def retrieve(req: RetrieveRequest) -> RetrieveResponse:
             distances = raw_results.get("distances", [[]])[0]
 
             for doc, meta, dist in zip(documents, metadatas, distances):
-                sem_sim = max(0.0, 1.0 - dist)
+                # Chroma uses squared L2 distance (||u-v||^2 = 2 - 2*cos_sim) for normalized embeddings.
+                # Accurate cosine similarity formula: 1.0 - (dist / 2.0).
+                sem_sim = max(0.0, 1.0 - (dist / 2.0))
                 kw_sc = _keyword_score(clean_query, doc, url=meta.get("url", ""), title=meta.get("title", ""))
                 final_sc = (0.68 * sem_sim) + (0.32 * kw_sc)
 
@@ -379,7 +385,9 @@ def retrieve(req: RetrieveRequest) -> RetrieveResponse:
             distances = raw_results.get("distances", [[]])[0]
 
             for doc, meta, dist in zip(documents, metadatas, distances):
-                sem_sim = max(0.0, 1.0 - dist)
+                # Chroma uses squared L2 distance (||u-v||^2 = 2 - 2*cos_sim) for normalized embeddings.
+                # Accurate cosine similarity formula: 1.0 - (dist / 2.0).
+                sem_sim = max(0.0, 1.0 - (dist / 2.0))
                 kw_sc = _keyword_score(clean_query, doc, url=meta.get("url", ""), title=meta.get("title", ""))
                 final_sc = (0.68 * sem_sim) + (0.32 * kw_sc)
 

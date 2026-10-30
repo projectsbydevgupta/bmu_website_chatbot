@@ -560,28 +560,67 @@ When clicked:
 
 ## 7. Vector Database & Embedding Pipelines
 
-### 7.1 ChromaDB Vector Store
-* **Storage Engine:** SQLite + HNSW (Hierarchical Navigable Small World) index.
-* **Location:** Persistent local directory `chroma_db_clean`.
-* **Collections:**
-  - `bmu_hybrid_knowledge` - Primary dense MiniLM collection used for sub-second retrieval.
-  - `bmu_voyage_knowledge` - Deep semantic collection generated via Voyage AI.
+### 7.1 ChromaDB Cloud Architecture & Dual Collection Isolation
+The system connects to **ChromaDB Cloud** (`api.trychroma.com`) using database `BMU_WEBSITE_CHATBOT`. To support different vector dimensions without conflicts, ChromaDB maintains **two completely isolated collections**:
+
+```
+                       ChromaDB Cloud (Database: BMU_WEBSITE_CHATBOT)
+                                      │
+         ┌────────────────────────────┴────────────────────────────┐
+         │                                                         │
+   Collection 1:                                             Collection 2:
+  "bmu_summaries"                                        "bmu_voyage_knowledge"
+  ┌─────────────────────────────────┐                       ┌─────────────────────────────────┐
+  │ • Model: all-MiniLM-L6-v2       │                       │ • Model: voyage-4-large         │
+  │ • Dimensions: 384               │                       │ • Dimensions: 1024              │
+  │ • Size: 1,258 documents         │                       │ • Size: 1,258 documents         │
+  │ • Status: ACTIVE (Fallback)     │                       │ • Status: ACTIVE (Production)   │
+  │ • Type: Local ONNX Runtime      │                       │ • Type: Cloud API (1024-dim)    │
+  └─────────────────────────────────┘                       └─────────────────────────────────┘
+```
 
 ---
 
-### 7.2 Dense MiniLM vs. Voyage AI Embeddings
-* **`sentence-transformers/all-MiniLM-L6-v2`:**
-  - Dimensionality: 384 dimensions.
-  - Runtime: Local CPU inference in **< 15ms**.
-  - Purpose: Fast real-time candidate search in `retrieval_service.py`.
-* **Voyage AI `voyage-3-large`:**
-  - Dimensionality: 1024 dimensions.
-  - Runtime: Cloud API embedding.
-  - Purpose: Deep semantic representation of complex university curriculum documents.
+### 7.2 Dense MiniLM (Local ONNX) vs. Voyage AI (Cloud API 1024-dim)
+
+| Feature | Primary Cloud Engine (Active) | Local ONNX Fallback Engine |
+| :--- | :--- | :--- |
+| **Model Name** | **`voyage-4-large`** | `all-MiniLM-L6-v2` |
+| **Dimensionality** | **1,024 dimensions** | 384 dimensions |
+| **Inference Runtime** | **Remote Cloud API (`https://api.voyageai.com/v1/embeddings`)** | Lightweight ONNX Runtime (`ef.ONNXMiniLM_L6_V2`) |
+| **Memory Footprint** | **0 MB Local RAM** (100% cloud inference) | ~90 MB RAM (Zero PyTorch overhead) |
+| **Target Collection** | **`bmu_voyage_knowledge` (1,258 docs)** | `bmu_summaries` (1,258 docs) |
+| **Configuration** | `RETRIEVAL_ENGINE=voyage` | `RETRIEVAL_ENGINE=minilm` |
+| **Role in System** | **Primary 1024-dim deep semantic search** | **High-speed offline fallback engine** |
+
+#### Why Voyage AI?
+The BMU website constantly publishes new notifications, exam schedules, and curriculum updates. We designed the **Knowledge Ingestion Microservice (`ingestion_service.py` on Port 8002)** with Voyage AI (`voyage-4-large`) so that university administrators can continuously crawl fresh pages, partition them into 800-character semantic chunks, and store deep 1024-dimensional embeddings into `bmu_voyage_knowledge`.
 
 ---
 
-### 7.3 Hybrid Scoring Formula
+### 7.3 Does the 1,258 Document Count Automatically Increase in ChromaDB?
+
+This is a critical architectural distinction:
+
+1. **`bmu_summaries` (1,258 Documents) — Fixed Production Golden Corpus:**
+   - **Does NOT automatically increase at runtime.**
+   - It is marked as **`READ-ONLY`** during live chat execution.
+   - **Why?** Academic institutions require 100% verified ground truth. If arbitrary live web scrapes automatically modified the production database, unverified marketing copy or formatting errors could corrupt student answers. It is only updated when an administrator explicitly runs an extractive summarization batch.
+
+2. **`bmu_voyage_knowledge` — Dynamic & Incremental Crawler Collection:**
+   - **DOES increase over time** whenever the ingestion crawler runs.
+   - When `ingestion_service.py` crawls new pages (via `POST /ingest/crawl` or `POST /ingest/url`), it extracts text, chunks it, embeds with Voyage AI, and inserts the new vectors into `bmu_voyage_knowledge`.
+   - **SHA-256 Deduplication:** Before calling the Voyage API, it computes a SHA-256 hash of the normalized chunk text. If that chunk ID already exists in ChromaDB, the chunk is skipped—preventing duplicate vector collisions and saving API credits.
+   - **On-Demand Execution:** The crawler runs **on-demand** (via API triggers or scheduled cron jobs) rather than an uncontrolled infinite background loop, ensuring strict protection against API rate limits and runaway cloud storage costs.
+
+---
+
+### 7.4 Side-by-Side Migration Verification Tool (`/retrieve/compare`)
+In `retrieval_service.py` (Port 8001), the endpoint `POST /retrieve/compare` runs incoming student queries against **both collections simultaneously**, allowing empirical comparison between the 384-dim local MiniLM baseline and the 1024-dim Voyage AI cloud model.
+
+---
+
+### 7.5 Hybrid Scoring Formula
 Pure vector similarity sometimes retrieves documents that mention general concepts but lack the exact keyword (e.g., retrieving *tuition* when the student asked for *hostel*).
 
 To solve this, `retrieval_service.py` computes:
@@ -917,6 +956,15 @@ python run_100_evaluation.py --limit 10 --provider both --resume
 
 ### Q4: How do I view traces?
 * **Fix:** Navigate to [http://localhost:6006](http://localhost:6006) while `phoenix_service.py` is running. All chat queries and evaluations appear under the Traces tab.
+
+### Q5: Why are there two collections (`bmu_voyage_knowledge` and `bmu_summaries`) in ChromaDB Cloud?
+* **Why:** `bmu_voyage_knowledge` (1,024-dim) is the primary high-precision vector database powered by Voyage AI (`voyage-4-large`). `bmu_summaries` (384-dim) is maintained as an offline/lightweight zero-cost fallback powered by MiniLM (`all-MiniLM-L6-v2`).
+
+### Q6: Do I need to select an embedding model in the ChromaDB Cloud web dashboard popup?
+* **No.** In ChromaDB Cloud's web UI, that prompt is solely for the search bar inside their web browser dashboard. Our Python backend code generates embeddings with Voyage AI directly before querying ChromaDB Cloud. You can choose Voyage AI or click "Cancel"/"Other".
+
+### Q7: How does the system answer broad overview questions (e.g. "Faculty details", "Courses offered")?
+* **Multi-Document Synthesis:** The retrieval tool dynamically prioritizes a synthesized multi-document overview bundle for broad queries. This provides the context auditor and synthesizer with records across all schools (Management, Law, Engineering, Liberal Studies) and visiting faculty, rather than locking onto a single professor or single elective.
 
 ---
 
