@@ -232,60 +232,63 @@ body {
 }
 
 .header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
   margin-left: 0.5rem;
+  flex-shrink: 0;
 }
 
 .eval-nav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #ffffff;
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 8px;
-  text-decoration: none;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  padding: 0.45rem 0.85rem !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background: #0f172a !important;
+  border: 1px solid #1e293b !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
+  white-space: nowrap !important;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  line-height: 1.2 !important;
 }
 
 .eval-nav-btn:hover {
-  background: #1e293b;
-  border-color: #334155;
-  color: #38bdf8;
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #38bdf8 !important;
   transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.25);
 }
 
 .phoenix-nav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #ffffff;
-  background: linear-gradient(135deg, #240b36 0%, #3b145a 100%);
-  border: 1px solid #581c87;
-  border-radius: 8px;
-  text-decoration: none;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  padding: 0.45rem 0.85rem !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 100%) !important;
+  border: 1px solid #6b21a8 !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(59, 20, 90, 0.25);
+  white-space: nowrap !important;
+  box-shadow: 0 2px 6px rgba(46, 16, 101, 0.3);
+  line-height: 1.2 !important;
 }
 
 .phoenix-nav-btn:hover {
-  background: linear-gradient(135deg, #2d0e44 0%, #4c1a74 100%);
-  border-color: #7e22ce;
-  color: #f3e8ff;
+  background: linear-gradient(135deg, #3b0764 0%, #581c87 100%) !important;
+  border-color: #9333ea !important;
+  color: #f5f3ff !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(88, 28, 135, 0.35);
+  box-shadow: 0 4px 12px rgba(88, 28, 135, 0.45);
 }
 
 .main-layout {
