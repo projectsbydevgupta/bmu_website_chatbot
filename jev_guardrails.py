@@ -151,11 +151,11 @@ BMU_KEYWORDS = {
 OUT_OF_SCOPE_KEYWORDS = {
     "recipe", "cake", "cook", "cooking", "fifa", "cricket", "bitcoin",
     "cryptocurrency", "stock", "weather", "netflix", "fortnite", "minecraft",
-    "playstation", "dating", "horoscope", "zodiac"
+    "playstation", "dating", "horoscope", "zodiac", "currency", "recipe"
 }
 
 OUT_OF_SCOPE_PHRASES = [
-    "president of", "prime minister", "capital of", "weather in", "weather of",
+    "president of", "prime minister", "capital of", "capital city", "weather in", "weather of",
     "cricket score", "stock price", "stock market", "movie review", "who is the pm",
     "who is pm", "lyrics of", "song lyrics", "cheat code"
 ]

@@ -7,7 +7,7 @@
 [![Ollama Local](https://img.shields.io/badge/Ollama-Local%20Llama%203.2-000000.svg)](https://ollama.com/)
 [![Google Stitch MCP](https://img.shields.io/badge/Stitch%20MCP-Obsidian%20Telemetry-4285F4.svg)](https://stitch.googleapis.com)
 
-An enterprise-grade, institutional AI Chatbot tailored specifically for **BML Munjal University (BMU)**. Engineered with a decoupled **4-microservices architecture**, an autonomous 3-agent **LangGraph** state machine, a two-stage **JEV Guardrails** security and hallucination mitigation engine, dual-engine LLM runtime (**Groq Cloud LPU** vs. **Local Ollama**), end-to-end **Arize Phoenix** OpenTelemetry tracing, and a **100-Question Benchmark Observatory Dashboard** designed with **Google Stitch MCP**.
+An enterprise-grade, institutional AI Chatbot tailored specifically for **BML Munjal University (BMU)**. Powered by a high-throughput **asynchronous web crawler & Trafilatura ingestion microservice** continuously indexing the live `bmu.edu.in` ecosystem into a **1,024-dimensional Voyage AI vector knowledge base** (`voyage-3-lite` on ChromaDB Cloud) with real-time webpage scraping fallback. Engineered across a decoupled **4-microservices architecture**, an autonomous 3-agent **LangGraph** state machine (Query Specialist, Evidence Retriever, and Response Synthesizer), a two-stage **JEV Guardrails** security and hallucination mitigation engine, a dual-engine LLM runtime (**Groq Cloud LPU** vs. **Local Ollama**), end-to-end **Arize Phoenix** OpenTelemetry distributed tracing, and a **100-Question Benchmark Observatory Dashboard** designed with **Google Stitch MCP**.
 
 ---
 

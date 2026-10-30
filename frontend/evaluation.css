@@ -201,6 +201,26 @@ body {
   border-color: var(--surface-border-strong);
 }
 
+.btn-phoenix {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.4) 0%, rgba(126, 34, 206, 0.5) 100%);
+  border: 1px solid #7e22ce;
+  color: #f3e8ff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(88, 28, 135, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-phoenix:hover {
+  background: linear-gradient(135deg, rgba(107, 33, 168, 0.6) 0%, rgba(147, 51, 234, 0.7) 100%);
+  border-color: #a855f7;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(126, 34, 206, 0.4);
+}
+
 .export-btn-group {
   display: inline-flex;
   align-items: center;
