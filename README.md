@@ -1,6 +1,6 @@
 # 🎓 BMU Website Chatbot: Enterprise Multi-Agent RAG System
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7.svg?style=for-the-badge&logo=render&logoColor=white)](https://bmu-website-chatbot.onrender.com/dashboard/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7.svg?style=for-the-badge&logo=render&logoColor=white)](https://bmu-website-chatbot.onrender.com)
 [![Observatory](https://img.shields.io/badge/Benchmark%20Observatory-Live-6366F1.svg?style=for-the-badge&logo=google-cloud&logoColor=white)](https://bmu-website-chatbot.onrender.com/dashboard/evaluation.html)
 [![Arize Phoenix](https://img.shields.io/badge/Arize%20Phoenix-Tracing%20Cloud-FF007A.svg?style=for-the-badge&logo=opentelemetry&logoColor=white)](https://app.phoenix.arize.com/s/bmu-chatbot/projects)
 [![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-Passing-10B981.svg?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/projectsbydevgupta/bmu_website_chatbot/actions)
@@ -15,7 +15,7 @@ An enterprise-grade, institutional AI Chatbot tailored specifically for **BML Mu
 
 | Service | Live URL | Description |
 | :--- | :--- | :--- |
-| 🚀 **Web Chat Assistant** | [bmu-website-chatbot.onrender.com/dashboard/](https://bmu-website-chatbot.onrender.com/dashboard/) | Production conversational AI interface with dual-engine toggle & guardrails |
+| 🚀 **Web Chat Assistant** | [bmu-website-chatbot.onrender.com](https://bmu-website-chatbot.onrender.com) | Production conversational AI interface with dual-engine toggle & guardrails |
 | 📊 **Benchmark Observatory** | [bmu-website-chatbot.onrender.com/dashboard/evaluation.html](https://bmu-website-chatbot.onrender.com/dashboard/evaluation.html) | 100-Query RAGAS telemetry dashboard with radar plots & side-by-side inspection |
 | 🔭 **Arize Phoenix Tracing** | [app.phoenix.arize.com/s/bmu-chatbot/projects](https://app.phoenix.arize.com/s/bmu-chatbot/projects) | Cloud OpenTelemetry tracing: spans, latencies, tokens, and prompt inspector |
 | 🩺 **System Health Probe** | [bmu-website-chatbot.onrender.com/health](https://bmu-website-chatbot.onrender.com/health) | Real-time JSON health status across all microservices and vector indices |
