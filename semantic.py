@@ -15,7 +15,7 @@ from bmu_rag_graph import bmu_rag_app, BMURAGState
 load_dotenv()
 
 try:
-    from phoenix_tracer import init_phoenix_tracing, get_tracer
+    from phoenix_tracer import init_phoenix_tracing, get_tracer, flush_traces
     init_phoenix_tracing()
 except Exception:
     def get_tracer():
@@ -30,6 +30,9 @@ except Exception:
             def start_as_current_span(self, *args, **kwargs):
                 return _NoOpSpan()
         return _NoOpTracer()
+
+    def flush_traces():
+        pass
 
 
 app = FastAPI(title="BMU Multi-Agent Semantic QA API (LangGraph + JEV)", version="2.0.0")
@@ -337,6 +340,7 @@ def _build_answer(
                 span.set_attribute("guardrail.action", resp.guardrail.action)
                 span.set_attribute("guardrail.reason", resp.guardrail.reason)
                 span.set_attribute("guardrail.engine", resp.guardrail.engine)
+            flush_traces()
             return resp
     except Exception:
         # Fallback to direct execution if tracing encounters any issue
