@@ -19,9 +19,16 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
 
 from dotenv import load_dotenv
 from groq import Groq
-from langgraph.graph import END, StateGraph
+try:
+    from langgraph.graph import END, StateGraph
+except ImportError:
+    END = "__end__"
+    StateGraph = None
 import requests
-import trafilatura
+try:
+    import trafilatura
+except ImportError:
+    trafilatura = None
 
 # Load environment
 ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -475,7 +482,7 @@ def retrieval_tool_node(state: BMURAGState) -> Dict[str, Any]:
             if enable_scraping and url:
                 try:
                     resp_web = requests.get(url, headers=browser_headers, timeout=2.0)
-                    if resp_web.status_code == 200 and resp_web.text:
+                    if trafilatura and resp_web.status_code == 200 and resp_web.text:
                         extracted = trafilatura.extract(resp_web.text)
                         if extracted and len(extracted.strip()) > 100:
                             content_text = extracted[:4000]
@@ -848,6 +855,8 @@ Question:
 # =====================================================================
 
 def create_bmu_rag_graph():
+    if StateGraph is None:
+        raise ImportError("langgraph package is required to compile the StateGraph. Install via `pip install langgraph`.")
     workflow = StateGraph(BMURAGState)
 
     # Add Nodes
@@ -884,4 +893,7 @@ def create_bmu_rag_graph():
 
 
 # Global compiled app
-bmu_rag_app = create_bmu_rag_graph()
+try:
+    bmu_rag_app = create_bmu_rag_graph()
+except Exception as _e:
+    bmu_rag_app = None
