@@ -166,6 +166,7 @@ def _build_answer_internal(
     initial_state: BMURAGState = {
         "raw_query": query,
         "llm_provider": provider,
+        "guardrails_enabled": enable_guardrails,
         "optimized_query": query,
         "keywords": [],
         "intent_category": input_category,

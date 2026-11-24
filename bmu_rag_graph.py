@@ -150,6 +150,7 @@ class AgentTraceItem(TypedDict):
 class BMURAGState(TypedDict):
     raw_query: str
     llm_provider: Optional[str]  # "groq" | "local"
+    guardrails_enabled: Optional[bool]
 
     # Agent 1 outputs
     optimized_query: str
@@ -767,8 +768,28 @@ def response_synthesizer_node(state: BMURAGState) -> Dict[str, Any]:
     raw_query = state.get("raw_query", "")
     vetted_context = state.get("vetted_context", "")
     provider = (state.get("llm_provider") or "groq").lower()
+    guardrails_enabled = state.get("guardrails_enabled", True)
 
     client, model_name = get_llm_client("synthesis", provider=provider)
+
+    mixed_intent_rule = (
+        "5. Mixed-Intent & Out-of-Scope Sub-Request Policy (STRICT): If the student's message combines a legitimate BMU question "
+        "with ANY out-of-scope or general-purpose side request (such as writing programming/Python code, solving coding/math homework, "
+        "writing essays, cooking recipes, or general trivia NOT present in the Context), you MUST:\n"
+        "   - Answer ONLY the BMU-related part strictly from the provided Context.\n"
+        "   - NEVER write code snippets, programming examples, tutorials, or general-knowledge answers from your own memory.\n"
+        "   - Add one brief, polite note stating that you are specialized exclusively in official BML Munjal University information "
+        "and cannot fulfill the general/coding request while Guardrails are ON (they may toggle Guardrails OFF for general assistance)."
+        if guardrails_enabled
+        else "5. Guardrails Bypassed Mode: Answer the BMU part accurately from the provided Context, and you may also helpfully answer any general/coding sub-request in the message."
+    )
+
+    system_msg = (
+        "You are the official BMU Academic Assistant. Answer strictly from the provided context. "
+        "NEVER write programming code or fulfill out-of-scope side requests not present in the context."
+        if guardrails_enabled
+        else "You are the BMU Academic Assistant operating with Guardrails OFF."
+    )
 
     prompt = f"""You are the official BMU Academic Assistant for BML Munjal University.
 
@@ -782,6 +803,7 @@ Guidelines:
    - Hierarchy Rule: Never dump an exhaustive multi-bullet personal CV of a single individual professor (e.g. their previous colleges or degree years) unless the user explicitly inquired about that specific person by name. If individual faculty names appear in the context, list them concisely as leadership or representative examples under their respective schools.
 3. Grounding & Zero-Hallucination: Do not assume, speculate, or extrapolate facts not present in the context. If the context does not explicitly mention a detail, state clearly that it is not specified in current records.
 4. Formatting: Do not use markdown headers (# or ##). Keep paragraphs tidy, polite, and well-structured using bold titles and clean bullet points.
+{mixed_intent_rule}
 
 Context:
 {vetted_context}
@@ -796,7 +818,7 @@ Question:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are the official BMU Academic Assistant. Answer strictly from context.",
+                    "content": system_msg,
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -814,7 +836,7 @@ Question:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are the official BMU Academic Assistant. Answer strictly from context.",
+                            "content": system_msg,
                         },
                         {"role": "user", "content": prompt},
                     ],
