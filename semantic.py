@@ -425,6 +425,9 @@ def guardrails_status() -> dict[str, Any]:
     return {
         "status": "active",
         "has_live_jev_client": jev_guardrail.has_live_client,
+        "enabled": jev_guardrail.enabled,
+        "model": jev_guardrail.model if jev_guardrail.has_live_client else "jev-system-one-local",
+        "base_url": jev_guardrail.base_url if jev_guardrail.has_live_client else None,
         "engine": "jev-cloud" if jev_guardrail.has_live_client else "jev-system-one-local",
         "active_guardrails": [
             "Input Prompt Injection Detection (Noul)",
